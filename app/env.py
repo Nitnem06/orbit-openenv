@@ -25,8 +25,8 @@ from __future__ import annotations
 
 from typing import Optional
 
-from grader import compute_step_reward, grade_mission
-from models import (
+from app.grader import compute_step_reward, grade_mission
+from app.models import (
     Action,
     AddBurnAction,
     Observation,
@@ -38,8 +38,8 @@ from models import (
     StepResult,
     SubmitMissionAction,
 )
-from physics import apply_burn, orbital_velocity
-from tasks import TASKS, get_task
+from aop.physics import apply_burn, orbital_velocity
+from app.tasks import TASKS, get_task
 
 
 class OrbitEnvironment:
