@@ -36,7 +36,7 @@ from openai import OpenAI
 # ─────────────────────────────────────────────────────────────────────────────
 
 WS_URL      = "ws://localhost:7860/ws"
-MODEL       = "gpt-4o"
+MODEL       = "llama-3.3-70b-versatile"
 TEMPERATURE = 0  # Deterministic — same inputs always produce same outputs
 MAX_TOKENS  = 500
 
@@ -48,17 +48,20 @@ TASKS = ["leo_satellite", "lunar_orbit", "asteroid_rendezvous"]
 
 def get_openai_client() -> OpenAI:
     """
-    Create OpenAI client using OPENAI_API_KEY from environment variables.
+    Create Groq client using GROQ_API_KEY from environment variables.
     Exits with helpful error if key is not set.
     """
-    api_key = os.environ.get("OPENAI_API_KEY")
+    api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
-        print("❌ ERROR: OPENAI_API_KEY environment variable not set.")
+        print("❌ ERROR: GROQ_API_KEY environment variable not set.")
         print("   Set it with:")
-        print("   Windows : set OPENAI_API_KEY=your_key_here")
-        print("   macOS   : export OPENAI_API_KEY=your_key_here")
+        print("   Windows : set GROQ_API_KEY=your_key_here")
+        print("   macOS   : export GROQ_API_KEY=your_key_here")
         sys.exit(1)
-    return OpenAI(api_key=api_key)
+    return OpenAI(
+        api_key  = api_key,
+        base_url = "https://api.groq.com/openai/v1"
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

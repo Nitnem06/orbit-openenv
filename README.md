@@ -200,13 +200,14 @@ ws://localhost:7860/ws
 
 ## 📈 Baseline Scores
 
-Scores achieved by the GPT-4 baseline agent (`temperature=0`):
+Scores achieved by the Llama 3.3 70B baseline agent (`temperature=0`):
 
-| Mission | Score |
-|---------|-------|
-| LEO Satellite Deployment | TBD |
-| Lunar Orbit Insertion | TBD |
-| Asteroid Mining Rendezvous | TBD |
+| Mission | Score | Δv Used | Steps |
+|---------|-------|---------|-------|
+| LEO Satellite Deployment | 0.4550 | 12,000 m/s | 6 |
+| Lunar Orbit Insertion | 0.5940 | 5,000 m/s | 12 |
+| Asteroid Mining Rendezvous | 0.2195 | 8,000 m/s | 24 |
+| **Average** | **0.4228** | — | — |
 
 ---
 
