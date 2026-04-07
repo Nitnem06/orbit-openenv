@@ -1,0 +1,183 @@
+# OpenEnv Specification File
+# Orbit — AI Space Mission Architect
+
+env_id: orbit-mission-architect
+name: Orbit — AI Space Mission Architect
+version: "1.0.0"
+description: >
+  An OpenEnv environment where an AI agent learns to design space missions
+  by planning fuel-efficient routes to space destinations using real orbital
+  mechanics (Hohmann transfers, gravity assists, Δ-v budgeting).
+
+author: Nitnem06 & Shimul
+license: MIT
+repository: https://github.com/Nitnem06/orbit-openenv
+
+# Interface Configuration
+interface:
+  type: websocket
+  endpoint: /ws
+  host: 0.0.0.0
+  port: 7860
+
+# Tasks
+tasks:
+  - id: leo_satellite
+    name: LEO Satellite Deployment
+    difficulty: easy
+    description: >
+      Get a satellite into a 400km circular Low Earth Orbit (LEO).
+      The agent must choose launch parameters and perform a single
+      circularization burn efficiently.
+    optimal_delta_v_ms: 9400
+    max_steps: 10
+    reward_range: [0.0, 1.0]
+
+  - id: lunar_orbit
+    name: Lunar Orbit Insertion
+    difficulty: medium
+    description: >
+      Transfer a spacecraft from Earth to lunar orbit using a
+      trans-lunar injection burn, mid-course correction, and
+      lunar capture burn. Miss distance must be under 100km.
+    optimal_delta_v_ms: 3900
+    max_steps: 15
+    reward_range: [0.0, 1.0]
+
+  - id: asteroid_rendezvous
+    name: Asteroid Mining Rendezvous
+    difficulty: hard
+    description: >
+      Reach a near-Earth asteroid using two gravity assists (Earth + Venus).
+      Agent must optimize burn timing, flyby geometry, and plane changes
+      while balancing total Δ-v against time-of-flight.
+    optimal_delta_v_ms: 5800
+    max_steps: 20
+    reward_range: [0.0, 1.0]
+
+# Action Space
+action_space:
+  types:
+    - name: set_orbit
+      description: Set orbital parameters directly
+      fields:
+        - name: altitude_km
+          type: float
+          description: Target orbit altitude in kilometers
+        - name: eccentricity
+          type: float
+          description: Orbital eccentricity (0.0 = circular)
+        - name: inclination_deg
+          type: float
+          description: Orbital inclination in degrees
+
+    -     name: add_burn
+          description: Apply a propulsive burn to change velocity
+          fields:
+            - name: delta_v_ms
+              type: float
+              description: Magnitude of velocity change in m/s
+            - name: prograde
+              type: float
+              description: Prograde component (-1.0 to 1.0)
+            - name: radial
+              type: float
+              description: Radial component (-1.0 to 1.0)
+            - name: normal
+              type: float
+              description: Normal component (-1.0 to 1.0), for inclination changes
+
+    - name: set_flyby
+      description: Configure a gravity assist flyby
+      fields:
+        - name: body
+          type: string
+          description: Celestial body name (earth, venus, moon)
+        - name: altitude_km
+          type: float
+          description: Flyby periapsis altitude in kilometers
+
+    - name: run_simulation
+      description: Run the current mission plan through physics simulation
+      fields: []
+
+    - name: submit_mission
+      description: Submit the final mission plan for grading
+      fields: []
+
+# Observation Space
+observation_space:
+  fields:
+    - name: task_id
+      type: string
+      description: Current mission identifier
+
+    - name: current_orbit
+      type: object
+      description: Current orbital parameters
+      subfields:
+        - name: altitude_km
+          type: float
+        - name: eccentricity
+          type: float
+        - name: inclination_deg
+          type: float
+
+    - name: target_orbit
+      type: object
+      description: Target orbital parameters to achieve
+
+    - name: delta_v_used
+      type: float
+      description: Total Δ-v spent so far in m/s
+
+    - name: delta_v_remaining
+      type: float
+      description: Remaining fuel budget in m/s
+
+    - name: trajectory
+      type: array
+      description: List of orbital states visited
+
+    - name: step_index
+      type: integer
+      description: Current step number
+
+    - name: max_steps
+      type: integer
+      description: Maximum allowed steps for this task
+
+# Reward Function
+reward:
+  type: deterministic
+  description: >
+    Reward is based on Δ-v efficiency using Newtonian physics and
+    Hohmann transfer equations. No LLM-as-judge. Partial credit
+    is awarded for progress toward the target orbit.
+  formula: optimal_delta_v / actual_delta_v
+  range: [0.0, 1.0]
+
+# Message Protocol (WebSocket JSON)
+protocol:
+  client_messages:
+    - type: reset
+      fields: [task_id]
+    - type: step
+      fields: [action]
+    - type: state
+      fields: []
+
+  server_messages:
+    - type: observation
+      fields: [data]
+    - type: step_result
+      fields: [observation, reward, done, info]
+    - type: state
+      fields: [data]
+
+# Deployment
+deployment:
+  platform: Hugging Face Spaces
+  space_url: https://huggingface.co/spaces/Nitnem06/orbit-mission-architect
+  websocket_url: wss://nitnem06-orbit-mission-architect.hf.space/ws
+  container_port: 7860
