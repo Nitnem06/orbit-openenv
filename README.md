@@ -200,7 +200,7 @@ ws://localhost:7860/ws
 
 ## 📈 Baseline Scores
 
-Scores achieved by the Llama 3.3 70B baseline agent (`temperature=0`):
+Scores achieved by the GPT-4 baseline agent (`temperature=0`):
 
 | Mission | Score | Δv Used | Steps |
 |---------|-------|---------|-------|
