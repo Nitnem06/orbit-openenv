@@ -231,6 +231,20 @@ wss://nitnem06-orbit-mission-architect.hf.space/ws
 
 ---
 
+## 🚀 Orbit Environment API
+
+### Live Demo:
+https://Nitnem-orbit-env.hf.space/docs
+
+### Description:
+AI-powered simulation environment for orbital physics with FastAPI backend.
+
+### Features:
+- Physics simulation
+- Task evaluation
+- Visualization support
+
+
 ## 🛠️ Tech Stack
 
 | Tool | Purpose |
