@@ -4,7 +4,7 @@ emoji: 🚀
 colorFrom: blue
 colorTo: purple
 sdk: docker
-pinned: false
+app_port: 7860
 ---
 
 # 🚀 Orbit — AI Space Mission Architect
