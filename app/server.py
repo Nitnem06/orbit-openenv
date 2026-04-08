@@ -101,21 +101,26 @@ from fastapi import Request
 async def http_reset(request: Request):
     global env_instance
 
+    # SAFE JSON parsing (handles empty body)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    # Create new environment
     env_instance = OrbitEnvironment()
 
-    body = await request.json() if request else {}
-    task_id = body.get("task_id")
-
+    # Get task_id safely
+    task_id = body.get("task_id") if isinstance(body, dict) else None
     if not task_id:
-        task_id = list_tasks()[0]
+        task_id = list_tasks()[0]  # default task
 
     observation = env_instance.reset(task_id)
 
     return {
-    "observation": observation.model_dump(),
-    "reward": 0.0,
-    "done": False
-}
+        "observation": observation.model_dump(),
+        "done": False
+    }
 
 class StepRequest(BaseModel):
     action: Dict[str, Any]
