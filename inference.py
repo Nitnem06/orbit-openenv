@@ -26,7 +26,10 @@ from openai import OpenAI
 
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-72B-Instruct")
-API_KEY      = os.getenv("HF_TOKEN")     or os.getenv("API_KEY", "dummy")
+HF_TOKEN     = os.getenv("HF_TOKEN")  # No default — must be set by user
+
+# Optional — if you use from_docker_image()
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 
 WS_URL       = "ws://localhost:7860/ws"
 TEMPERATURE  = 0
@@ -258,7 +261,7 @@ async def main() -> None:
 
     # Setup OpenAI client pointing to configured LLM endpoint
     client = OpenAI(
-        api_key  = API_KEY,
+        api_key  = HF_TOKEN,
         base_url = API_BASE_URL,
     )
 
