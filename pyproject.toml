@@ -13,8 +13,12 @@ dependencies = [
     "numpy==2.2.6",
     "openai==2.30.0",
     "websockets==16.0",
+    "openenv-core>=0.2.0",
 ]
 
-[project.urls]
-Homepage = "https://huggingface.co/spaces/Nitnem/orbit-env"
-Repository = "https://github.com/Nitnem06/orbit-openenv"
+[project.scripts]
+server = "app.server:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
