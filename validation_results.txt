@@ -1,9 +1,0 @@
-=== Validation Results ===
-Date: Wed, Apr  8, 2026  9:47:28 PM
-
-1. HF Space /reset: HTTP 200 ✅
-2. Docker build: Succeeded ✅
-3. openenv validate: Passed ✅
-
-HF Space URL: https://nitnem-orbit-env.hf.space
-GitHub Repo: https://github.com/Nitnem06/orbit-openenv
