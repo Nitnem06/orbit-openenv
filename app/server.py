@@ -94,6 +94,14 @@ async def health() -> JSONResponse:
     """Hugging Face Spaces health check."""
     return JSONResponse({"status": "healthy"})
 
+@app.post("/reset")
+async def http_reset() -> JSONResponse:
+    """HTTP POST /reset endpoint for OpenEnv validator ping."""
+    return JSONResponse({
+        "status": "ok",
+        "tasks": list_tasks(),
+    })
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # WebSocket Helpers
