@@ -223,11 +223,11 @@ Scores achieved by the GPT-4 baseline agent (`temperature=0`):
 ## 🌍 Deployment
 
 **Live on Hugging Face Spaces:**
-https://huggingface.co/spaces/Nitnem06/orbit-mission-architect
+https://huggingface.co/spaces/Nitnem/orbit-env
 
 
 **WebSocket URL:**
-wss://nitnem06-orbit-mission-architect.hf.space/ws
+wss://nitnem-orbit-env.hf.space/ws
 
 ---
 
@@ -263,7 +263,7 @@ AI-powered simulation environment for orbital physics with FastAPI backend.
 
 | Person | Role | Branch |
 |--------|------|--------|
-| Nitnem | Physics & Engine Architect | `p1-physics` |
+| Nitnem | Physics & Engine Architect | `p1` |
 | Shimul | Interface & Integration Lead | `p2-server` |
 
 ---
