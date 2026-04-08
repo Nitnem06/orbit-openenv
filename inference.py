@@ -191,14 +191,22 @@ async def run_mission(client: OpenAI, task_id: str) -> dict:
                 action_str = json.dumps(action)
 
                 # Send action to environment
+                # Send action to environment
                 await ws.send(json.dumps({"type": "step", "action": action}))
                 result = json.loads(await ws.recv())
 
-                observation = result["observation"]
-                reward      = result["reward"]
-                done        = result["done"]
-                info        = result.get("info", {})
-                error       = info.get("error", None)
+                # Handle error responses gracefully
+                if result.get("type") == "error":
+                    error = result.get("message", "unknown error")
+                    reward = -0.1
+                    done = False
+                    info = {}
+                else:
+                    observation = result["observation"]
+                    reward      = result["reward"]
+                    done        = result["done"]
+                    info        = result.get("info", {})
+                    error       = info.get("error", None)
 
                 rewards.append(reward)
                 steps_taken = step
