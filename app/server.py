@@ -28,7 +28,7 @@ from typing import Any, Dict
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
-from pydantic import TypeAdapter, ValidationError
+from pydantic import TypeAdapter, ValidationError,BaseModel
 
 from app.env import OrbitEnvironment
 from app.models import (
@@ -40,13 +40,14 @@ from app.models import (
     SubmitMissionAction,
 )
 from app.tasks import get_task_summary, list_tasks
+env_instance: OrbitEnvironment | None = None
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Logging Setup
 # ─────────────────────────────────────────────────────────────────────────────
 
 logging.basicConfig(
-    level  = logging.INFO,
+    level  = logging.WARNING,
     format = "%(asctime)s [%(levelname)s] %(message)s",
 )
 logger = logging.getLogger(__name__)
@@ -94,14 +95,69 @@ async def health() -> JSONResponse:
     """Hugging Face Spaces health check."""
     return JSONResponse({"status": "healthy"})
 
-@app.post("/reset")
-async def http_reset() -> JSONResponse:
-    """HTTP POST /reset endpoint for OpenEnv validator ping."""
-    return JSONResponse({
-        "status": "ok",
-        "tasks": list_tasks(),
-    })
+from fastapi import Request
 
+@app.post("/reset")
+async def http_reset(request: Request):
+    global env_instance
+
+    env_instance = OrbitEnvironment()
+
+    body = await request.json() if request else {}
+    task_id = body.get("task_id")
+
+    if not task_id:
+        task_id = list_tasks()[0]
+
+    observation = env_instance.reset(task_id)
+
+    return {
+    "observation": observation.model_dump(),
+    "reward": 0.0,
+    "done": False
+}
+
+class StepRequest(BaseModel):
+    action: Dict[str, Any]
+
+
+@app.post("/step")
+async def http_step(req: StepRequest):
+    global env_instance
+
+    if env_instance is None:
+        return JSONResponse(
+            {"error": "Environment not initialized. Call /reset first."},
+            status_code=400
+        )
+
+    try:
+        action = parse_action(req.action)
+        result = env_instance.step(action)
+
+        return {
+            "observation": result.observation.model_dump(),
+            "reward": result.reward,
+            "done": result.done,
+            "info": result.info,
+        }
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    
+@app.post("/close")
+async def http_close():
+    global env_instance
+
+    if env_instance:
+        try:
+            env_instance.close()
+        except Exception:
+            pass
+
+    env_instance = None
+
+    return {"status": "closed"}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # WebSocket Helpers
