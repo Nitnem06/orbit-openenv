@@ -1,3 +1,10 @@
+title: Orbit Env
+emoji: 🚀
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_port: 7860
+
 # Key Differences I See
 
 Your current README has:
@@ -21,14 +28,6 @@ Your current README has:
 
 ## Updated `README.md`
 
-```markdown
----
-title: Orbit Env
-emoji: 🚀
-colorFrom: blue
-colorTo: purple
-sdk: docker
-app_port: 7860
 ---
 
 # 🚀 Orbit — AI Space Mission Architect
