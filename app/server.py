@@ -97,90 +97,42 @@ async def root():
 body {
     font-family: 'Segoe UI', sans-serif;
     color:#e0e0e0;
-    overflow-x:hidden;
-    animation: fadeIn 1s ease-in-out;
-
     background: radial-gradient(circle at 20% 20%, #1a1f4d, #0a0e1a 40%),
                 radial-gradient(circle at 80% 30%, #2a0845, transparent 40%),
                 radial-gradient(circle at 50% 80%, #003973, transparent 40%);
-}
-
-@keyframes fadeIn {
-    from {opacity:0; transform:translateY(10px);}
-    to {opacity:1; transform:translateY(0);}
-}
-
-/* 🌌 Floating gradient blobs */
-body::before, body::after {
-    content:"";
-    position:fixed;
-    width:400px;
-    height:400px;
-    border-radius:50%;
-    filter: blur(120px);
-    opacity:0.25;
-    z-index:0;
-}
-
-body::before {
-    background:#7b2ff7;
-    top:-100px; left:-100px;
-}
-body::after {
-    background:#00d4ff;
-    bottom:-100px; right:-100px;
 }
 
 /* HEADER */
 .header {
     text-align:center;
     padding:80px 20px 40px;
-    position:relative;
-    z-index:1;
 }
-
 .header h1 {
     font-size:3.5em;
     letter-spacing:6px;
     background: linear-gradient(90deg,#00d4ff,#7b2ff7,#ff6bcb);
     -webkit-background-clip:text;
     -webkit-text-fill-color:transparent;
-    animation: glow 3s infinite alternate;
-}
-
-@keyframes glow {
-    from {text-shadow:0 0 10px #7b2ff7;}
-    to {text-shadow:0 0 30px #00d4ff;}
-}
-
-.header p {
-    color:#9aa4c0;
-    margin-top:10px;
 }
 
 /* SECTION */
 .section {
-    max-width:1200px;
+    max-width:1100px;
     margin:auto;
-    padding:60px 20px;
-    position:relative;
-    z-index:1;
+    padding:50px 20px;
 }
 
 /* CARD */
 .card {
     background: rgba(255,255,255,0.05);
     backdrop-filter: blur(14px);
-    border:1px solid rgba(255,255,255,0.1);
     border-radius:16px;
-    padding:24px;
+    padding:20px;
     margin-bottom:20px;
     transition:0.3s;
 }
-
 .card:hover {
-    transform:translateY(-6px) scale(1.01);
-    box-shadow:0 0 40px rgba(123,47,247,0.3);
+    transform:translateY(-5px);
 }
 
 /* GRID */
@@ -197,7 +149,6 @@ body::after {
     border-radius:8px;
     background: linear-gradient(135deg,#7b2ff7,#00d4ff);
     color:white;
-    font-weight:600;
     cursor:pointer;
     margin-top:10px;
 }
@@ -205,14 +156,14 @@ body::after {
 /* CANVAS */
 canvas {
     width:100%;
-    height:300px;
-    background:#000;
+    height:320px;
     border-radius:12px;
+    background:black;
 }
 
 /* CONSOLE */
 .console {
-    height:300px;
+    height:320px;
     overflow:auto;
     font-family:monospace;
     font-size:0.8em;
@@ -221,30 +172,27 @@ canvas {
     border-radius:10px;
 }
 
-/* FEATURE CARDS */
-.features {
-    display:grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px,1fr));
-    gap:20px;
+/* ACCORDION */
+.accordion {
+    cursor:pointer;
+    padding:15px;
+    border-radius:10px;
+    background: rgba(123,47,247,0.2);
+    margin-bottom:10px;
+    font-weight:600;
 }
 
-.feature {
-    padding:20px;
-    border-radius:14px;
-    background: linear-gradient(135deg, rgba(123,47,247,0.2), rgba(0,212,255,0.15));
-    border:1px solid rgba(255,255,255,0.1);
+.panel {
+    max-height:0;
+    overflow:hidden;
+    transition:max-height 0.3s ease;
+    padding:0 10px;
+    color:#9aa4c0;
 }
 
-/* FOOTER */
-.footer {
-    text-align:center;
-    padding:60px 20px;
-    color:#6b7280;
-}
-
-/* RESPONSIVE */
-@media(max-width:800px){
-    .grid { grid-template-columns:1fr; }
+.panel.open {
+    max-height:200px;
+    padding:10px;
 }
 </style>
 </head>
@@ -256,18 +204,7 @@ canvas {
     <p>AI Space Mission Architect</p>
 </div>
 
-<!-- 🌌 HERO / DESCRIPTION -->
-<div class="section">
-<div class="card">
-    <h2>🚀 What is Orbit?</h2>
-    <p>
-    Orbit is a next-generation RL environment where AI agents design space missions
-    using real orbital mechanics — optimizing fuel, trajectory, and mission success.
-    </p>
-</div>
-</div>
-
-<!-- 🛰️ SIMULATOR -->
+<!-- SIMULATOR -->
 <div class="section">
 <div class="grid">
 
@@ -277,116 +214,127 @@ canvas {
 </div>
 
 <div class="card">
-<h3>🔌 Live WebSocket Console</h3>
+<h3>🔌 Live Console</h3>
 <div class="console" id="console"></div>
 
 <button class="btn" onclick="connectWS()">Connect</button>
 <button class="btn" onclick="resetMission()">Reset</button>
 <button class="btn" onclick="stepMission()">Step</button>
 
-<input id="taskInput" placeholder="task_id (leo_satellite)">
+<input id="taskInput" placeholder="task_id">
 </div>
 
 </div>
 </div>
 
-<!-- ✨ FEATURES -->
-<div class="section">
-<h2>✨ Features</h2>
-<div class="features">
-    <div class="feature">⚡ Real-time mission simulation</div>
-    <div class="feature">🧠 RL-ready environment</div>
-    <div class="feature">🛰️ Orbital maneuver planning</div>
-    <div class="feature">📊 Deterministic scoring</div>
-</div>
-</div>
-
-<!-- 🚀 MISSIONS -->
+<!-- MISSIONS -->
 <div class="section">
 <h2>🚀 Missions</h2>
-<div class="card">LEO Satellite Deployment</div>
-<div class="card">Lunar Orbit Insertion</div>
-<div class="card">Asteroid Bennu Rendezvous</div>
+
+<div class="accordion">LEO Satellite Deployment</div>
+<div class="panel">
+Launch satellite to 400km orbit at ISS inclination with high fuel margin.
 </div>
 
-<!-- 📊 EXTRA SPACE (FOR SCROLL DEPTH) -->
-<div class="section">
-<div class="card">
-<h2>📡 Why It Matters</h2>
-<p>
-This project bridges AI and aerospace engineering — enabling intelligent
-decision-making in mission-critical environments.
-</p>
+<div class="accordion">Lunar Orbit Insertion</div>
+<div class="panel">
+Two-step Earth → Moon transfer using TLI and LOI burns.
 </div>
 
-<div class="card">
-<h2>🌍 Future Scope</h2>
-<p>
-Multi-agent planning, real-time trajectory visualization, and integration with
-space datasets.
-</p>
-</div>
+<div class="accordion">Asteroid Bennu Rendezvous</div>
+<div class="panel">
+Deep-space mission using gravity assists and multi-step planning.
 </div>
 
-<!-- FOOTER -->
-<div class="footer">
-    Built for Hackathon · Orbit v2.0
 </div>
 
 <script>
-/* ORBIT ANIMATION */
-const canvas = document.getElementById('orbitCanvas');
-const ctx = canvas.getContext('2d');
+/* ACCORDION */
+document.querySelectorAll(".accordion").forEach((btn,i)=>{
+    btn.addEventListener("click",()=>{
+        document.querySelectorAll(".panel").forEach(p=>p.classList.remove("open"));
+        document.querySelectorAll(".panel")[i].classList.toggle("open");
+    });
+});
+
+/* ORBIT SIMULATION */
+const canvas = document.getElementById("orbitCanvas");
+const ctx = canvas.getContext("2d");
 canvas.width = canvas.offsetWidth;
 canvas.height = canvas.offsetHeight;
 
-let angle = 0;
+let angle=0;
 
-function drawOrbit(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    let cx = canvas.width/2;
-    let cy = canvas.height/2;
+function draw(){
+    ctx.fillStyle="rgba(0,0,0,0.3)";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    let cx=canvas.width/2;
+    let cy=canvas.height/2;
+
+    // stars
+    for(let i=0;i<50;i++){
+        ctx.fillStyle="white";
+        ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height,1,1);
+    }
+
+    // planet glow
+    let grd = ctx.createRadialGradient(cx,cy,10,cx,cy,40);
+    grd.addColorStop(0,"#00d4ff");
+    grd.addColorStop(1,"transparent");
+    ctx.fillStyle=grd;
+    ctx.beginPath();
+    ctx.arc(cx,cy,40,0,Math.PI*2);
+    ctx.fill();
+
+    // orbit rings
+    ctx.strokeStyle="#444";
+    ctx.beginPath();
+    ctx.arc(cx,cy,100,0,Math.PI*2);
+    ctx.stroke();
 
     ctx.beginPath();
-    ctx.arc(cx,cy,20,0,Math.PI*2);
-    ctx.fillStyle="#00d4ff";
+    ctx.arc(cx,cy,150,0,Math.PI*2);
+    ctx.stroke();
+
+    // satellites
+    let x1 = cx + 100*Math.cos(angle);
+    let y1 = cy + 100*Math.sin(angle);
+
+    let x2 = cx + 150*Math.cos(-angle*0.7);
+    let y2 = cy + 150*Math.sin(-angle*0.7);
+
+    ctx.fillStyle="#fff";
+    ctx.beginPath();
+    ctx.arc(x1,y1,4,0,Math.PI*2);
     ctx.fill();
 
     ctx.beginPath();
-    ctx.arc(cx,cy,100,0,Math.PI*2);
-    ctx.strokeStyle="#555";
-    ctx.stroke();
-
-    let x = cx + 100*Math.cos(angle);
-    let y = cy + 100*Math.sin(angle);
-
-    ctx.beginPath();
-    ctx.arc(x,y,5,0,Math.PI*2);
-    ctx.fillStyle="#fff";
+    ctx.arc(x2,y2,4,0,Math.PI*2);
     ctx.fill();
 
     angle += 0.01;
-    requestAnimationFrame(drawOrbit);
+    requestAnimationFrame(draw);
 }
-drawOrbit();
+draw();
 
 /* WEBSOCKET */
 let ws;
 function log(msg){
-    let c = document.getElementById("console");
-    c.innerHTML += msg + "<br>";
-    c.scrollTop = c.scrollHeight;
+    let c=document.getElementById("console");
+    c.innerHTML+=msg+"<br>";
+    c.scrollTop=c.scrollHeight;
 }
 
 function connectWS(){
     ws = new WebSocket("wss://" + location.host + "/ws");
-    ws.onopen = () => log("✅ Connected");
-    ws.onmessage = (e) => log("📩 " + e.data);
+    ws.onopen=()=>log("Connected");
+    ws.onmessage=(e)=>log(e.data);
 }
 
 function resetMission(){
-    let task = document.getElementById("taskInput").value || "leo_satellite";
-    ws.send(JSON.stringify({type:"reset", task_id:task}));
+    let t=document.getElementById("taskInput").value||"leo_satellite";
+    ws.send(JSON.stringify({type:"reset",task_id:t}));
 }
 
 function stepMission(){
