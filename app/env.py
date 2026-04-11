@@ -5,20 +5,11 @@ Orbit — AI Space Mission Architect
 Core OpenEnv-compliant environment.
 Implements the standard reset() / step() / state() interface.
 
-Usage:
-    from app.env import OrbitEnvironment
-    from app.models import AddBurnAction, SubmitMissionAction
-
-    env = OrbitEnvironment()
-    obs = env.reset("leo_satellite")
-
-    action = AddBurnAction(delta_v_ms=9400, prograde=1.0, radial=0.0, normal=0.0)
-    result = env.step(action)
-
-    print(result.observation)   # Observation
-    print(result.reward)        # float in [-1, 1]
-    print(result.done)          # bool
-    print(result.info)          # dict with grade info, messages, etc.
+v2.0 Changes:
+    - Added ExecuteManeuverAction handler (strategic high-level actions)
+    - Observations now include available_maneuvers, mission_analysis, recommendations
+    - All original actions still work (backward compatible)
+    - Environment calculates delta-v internally for strategic maneuvers
 """
 
 from __future__ import annotations
@@ -29,6 +20,9 @@ from app.grader import compute_step_reward, grade_mission
 from app.models import (
     Action,
     AddBurnAction,
+    AvailableManeuver,
+    ExecuteManeuverAction,
+    MissionAnalysis,
     Observation,
     OrbitalState,
     RunSimulationAction,
@@ -38,7 +32,21 @@ from app.models import (
     StepResult,
     SubmitMissionAction,
 )
-from app.physics import apply_burn, orbital_velocity
+from app.physics import (
+    apply_burn,
+    compute_mission_analysis,
+    execute_circularize,
+    execute_combined_transfer,
+    execute_correction_burn,
+    execute_gravity_assist,
+    execute_hohmann_transfer,
+    execute_lunar_orbit_insertion,
+    execute_plane_change,
+    execute_trans_lunar_injection,
+    get_available_maneuvers,
+    get_recommendations,
+    orbital_velocity,
+)
 from app.tasks import TASKS, get_task
 
 
@@ -49,10 +57,10 @@ class OrbitEnvironment:
     The agent interacts with this class exclusively through:
         reset(task_id)  → Observation
         step(action)    → StepResult
-        state()         → State   (full internal state for debugging)
+        state()         → State
 
-    Internal state is a Pydantic State model — fully serialisable to JSON,
-    which is what the WebSocket server (server.py) depends on.
+    Supports both strategic maneuvers (ExecuteManeuverAction) and
+    legacy low-level burns (AddBurnAction).
     """
 
     def __init__(self) -> None:
@@ -67,14 +75,11 @@ class OrbitEnvironment:
         """
         Reset the environment and start a new episode for the given task.
 
-        Always call this before the first step(), and after an episode ends
-        (result.done == True) before starting a new one.
-
         Args:
             task_id: One of 'leo_satellite', 'lunar_orbit', 'asteroid_rendezvous'
 
         Returns:
-            Initial Observation — what the agent sees at the start of the episode.
+            Initial Observation with available maneuvers and mission analysis.
 
         Raises:
             ValueError: If task_id is not recognised.
@@ -89,7 +94,6 @@ class OrbitEnvironment:
         start  = self._task["start_orbit"]
         target = self._task["target_orbit"]
 
-        # Build starting orbital state
         current_orbit = OrbitalState(
             altitude_km     = start["altitude_km"],
             eccentricity    = start["eccentricity"],
@@ -98,7 +102,6 @@ class OrbitEnvironment:
             velocity_ms     = start.get("velocity_ms", 0.0),
         )
 
-        # Build target orbital state (what the agent is trying to reach)
         target_orbit = OrbitalState(
             altitude_km     = target["altitude_km"],
             eccentricity    = target["eccentricity"],
@@ -107,7 +110,6 @@ class OrbitEnvironment:
             velocity_ms     = target.get("velocity_ms", 0.0),
         )
 
-        # Initialise full internal state
         self._state = State(
             task_id         = task_id,
             current_orbit   = current_orbit,
@@ -117,6 +119,7 @@ class OrbitEnvironment:
             trajectory      = [current_orbit],
             burns           = [],
             flybys          = [],
+            maneuvers       = [],
             step_index      = 0,
             max_steps       = self._task["max_steps"],
             episode_done    = False,
@@ -136,8 +139,7 @@ class OrbitEnvironment:
         Execute one action and advance the environment by one step.
 
         Args:
-            action: Any Action subtype (SetOrbitAction, AddBurnAction,
-                    SetFlybyAction, RunSimulationAction, SubmitMissionAction).
+            action: Any Action subtype including ExecuteManeuverAction.
 
         Returns:
             StepResult with (observation, reward, done, info).
@@ -152,26 +154,20 @@ class OrbitEnvironment:
                 "Episode already finished. Call reset(task_id) to start a new episode."
             )
 
-        # Snapshot state BEFORE action for reward calculation
         prev_state_dict = self._state.model_dump()
 
-        # Increment step counter and log action
         self._state.step_index += 1
         action_dict = action.model_dump()
         self._state.action_history.append(action_dict)
 
-        # Dispatch to the correct handler
         reward, done, info, last_msg = self._dispatch(action, action_dict, prev_state_dict)
 
-        # Check step limit (only if episode not already done by SubmitMission)
         if not done and self._state.step_index >= self._state.max_steps:
             done, reward, info = self._handle_timeout(reward, info)
 
-        # Mark episode done if needed
         if done:
             self._state.episode_done = True
 
-        # Build final observation
         observation = self._build_observation(last_action_result=last_msg)
         if done:
             observation.mission_status = (
@@ -190,18 +186,7 @@ class OrbitEnvironment:
     # ─────────────────────────────────────────────────────────────────────────
 
     def state(self) -> State:
-        """
-        Return a copy of the full internal state.
-
-        Used by server.py for WebSocket state broadcasting,
-        and by visualizer.py for trajectory plotting.
-
-        Returns:
-            Deep copy of the current State model.
-
-        Raises:
-            RuntimeError: If reset() has not been called yet.
-        """
+        """Return a deep copy of the full internal state."""
         if self._state is None:
             raise RuntimeError("Environment not initialised. Call reset(task_id) first.")
         return self._state.model_copy(deep=True)
@@ -216,11 +201,12 @@ class OrbitEnvironment:
         action_dict: dict,
         prev_state_dict: dict,
     ) -> tuple[float, bool, dict, str]:
-        """
-        Route the action to the correct handler.
-        Returns (reward, done, info, last_message).
-        """
-        if isinstance(action, SetOrbitAction):
+        """Route the action to the correct handler."""
+
+        if isinstance(action, ExecuteManeuverAction):
+            return self._handle_execute_maneuver(action, action_dict, prev_state_dict)
+
+        elif isinstance(action, SetOrbitAction):
             return self._handle_set_orbit(action)
 
         elif isinstance(action, AddBurnAction):
@@ -236,18 +222,168 @@ class OrbitEnvironment:
             return self._handle_submit_mission()
 
         else:
-            # Unknown action type — should never happen with Pydantic validation
             return -0.05, False, {"error": f"Unknown action type: {type(action)}"}, "Unknown action."
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Individual Action Handlers
+    # NEW: Execute Maneuver Handler (Strategic Actions)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _handle_execute_maneuver(
+        self,
+        action: ExecuteManeuverAction,
+        action_dict: dict,
+        prev_state_dict: dict,
+    ) -> tuple:
+        """
+        Execute a high-level strategic maneuver.
+        The environment calculates the required delta-v internally.
+        """
+        maneuver = action.maneuver.value  # enum → string
+        current_orbit_dict = self._state.current_orbit.model_dump()
+        target_orbit_dict = self._task["target_orbit"]
+
+        # ── Route to the correct maneuver execution function ──
+        try:
+            new_orbit_dict, dv_consumed = self._execute_maneuver_physics(
+                maneuver, current_orbit_dict, target_orbit_dict, action
+            )
+        except ValueError as e:
+            msg = f"Maneuver '{maneuver}' failed: {str(e)}"
+            info = {"action_type": "execute_maneuver", "maneuver": maneuver,
+                    "rejected": True, "message": msg}
+            return -0.05, False, info, msg
+
+        # ── Check fuel budget ──
+        if dv_consumed > 0 and (self._state.delta_v_used + dv_consumed > self._state.delta_v_budget):
+            remaining = self._state.delta_v_budget - self._state.delta_v_used
+            msg = (
+                f"Maneuver '{maneuver}' REJECTED — needs {dv_consumed:.1f} m/s "
+                f"but only {remaining:.1f} m/s remaining."
+            )
+            info = {"action_type": "execute_maneuver", "maneuver": maneuver,
+                    "rejected": True, "delta_v_needed": round(dv_consumed, 2),
+                    "delta_v_remaining": round(remaining, 2), "message": msg}
+            return -0.10, False, info, msg
+
+        # ── Apply the maneuver ──
+        self._state.current_orbit = OrbitalState(**new_orbit_dict)
+        self._state.delta_v_used += dv_consumed
+        self._state.trajectory.append(self._state.current_orbit)
+
+        # Log the maneuver
+        self._state.maneuvers.append({
+            "step":         self._state.step_index,
+            "maneuver":     maneuver,
+            "delta_v_ms":   round(dv_consumed, 2),
+            "result_altitude_km": round(self._state.current_orbit.altitude_km, 2),
+            "result_inclination_deg": round(self._state.current_orbit.inclination_deg, 4),
+            "result_eccentricity": round(self._state.current_orbit.eccentricity, 6),
+        })
+
+        # ── Compute step reward ──
+        new_state_dict = self._state.model_dump()
+        reward = compute_step_reward(prev_state_dict, action_dict, new_state_dict)
+
+        remaining = self._state.delta_v_budget - self._state.delta_v_used
+        fuel_note = "(FREE — no fuel consumed)" if dv_consumed == 0 else f"Δv consumed: {dv_consumed:.1f} m/s"
+
+        msg = (
+            f"Maneuver '{maneuver}' executed successfully. {fuel_note}. "
+            f"New orbit: alt={self._state.current_orbit.altitude_km:.1f} km, "
+            f"e={self._state.current_orbit.eccentricity:.4f}, "
+            f"inc={self._state.current_orbit.inclination_deg:.1f}°. "
+            f"Budget remaining: {remaining:.1f} m/s."
+        )
+        info = {
+            "action_type":          "execute_maneuver",
+            "maneuver":             maneuver,
+            "delta_v_consumed_ms":  round(dv_consumed, 2),
+            "delta_v_remaining_ms": round(remaining, 2),
+            "new_altitude_km":      round(self._state.current_orbit.altitude_km, 2),
+            "new_eccentricity":     round(self._state.current_orbit.eccentricity, 6),
+            "new_inclination_deg":  round(self._state.current_orbit.inclination_deg, 4),
+            "message":              msg,
+        }
+        return reward, False, info, msg
+
+    def _execute_maneuver_physics(
+        self,
+        maneuver: str,
+        current_orbit: dict,
+        target_orbit: dict,
+        action: ExecuteManeuverAction,
+    ) -> tuple[dict, float]:
+        """
+        Execute the physics for a given maneuver type.
+        Returns (new_orbit_dict, delta_v_consumed).
+        """
+        if maneuver == "hohmann_transfer":
+            target_alt = action.target_altitude_km
+            if target_alt is None:
+                target_alt = target_orbit["altitude_km"]
+            return execute_hohmann_transfer(current_orbit, target_alt)
+
+        elif maneuver == "plane_change":
+            target_inc = action.target_inclination_deg
+            if target_inc is None:
+                target_inc = target_orbit["inclination_deg"]
+            return execute_plane_change(current_orbit, target_inc)
+
+        elif maneuver == "circularize":
+            return execute_circularize(current_orbit)
+
+        elif maneuver == "trans_lunar_injection":
+            if self._state.task_id != "lunar_orbit":
+                raise ValueError("Trans-Lunar Injection is only available for the lunar_orbit mission.")
+            return execute_trans_lunar_injection(current_orbit)
+
+        elif maneuver == "lunar_orbit_insertion":
+            if self._state.task_id != "lunar_orbit":
+                raise ValueError("Lunar Orbit Insertion is only available for the lunar_orbit mission.")
+            target_alt = action.target_altitude_km if action.target_altitude_km else 100.0
+            return execute_lunar_orbit_insertion(current_orbit, target_alt)
+
+        elif maneuver == "gravity_assist":
+            body = action.body
+            if body is None:
+                raise ValueError("Gravity assist requires a 'body' parameter (moon, venus, or earth).")
+            available = self._task.get("available_flybys", [])
+            if body not in available:
+                raise ValueError(
+                    f"Gravity assist around '{body}' not available for this mission. "
+                    f"Available: {available}"
+                )
+            # Log as flyby too (for backward compatibility)
+            self._state.flybys.append({
+                "body": body,
+                "periapsis_km": 500.0,
+                "step": self._state.step_index,
+            })
+            return execute_gravity_assist(current_orbit, body)
+
+        elif maneuver == "combined_transfer":
+            target_alt = action.target_altitude_km
+            target_inc = action.target_inclination_deg
+            if target_alt is None:
+                target_alt = target_orbit["altitude_km"]
+            if target_inc is None:
+                target_inc = target_orbit["inclination_deg"]
+            target_ecc = target_orbit.get("eccentricity", None)
+            return execute_combined_transfer(current_orbit, target_alt, target_inc, target_ecc)
+
+        elif maneuver == "correction_burn":
+            dv = action.delta_v_ms if action.delta_v_ms else 50.0
+            return execute_correction_burn(current_orbit, dv)
+
+        else:
+            raise ValueError(f"Unknown maneuver type: '{maneuver}'")
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Original Action Handlers (unchanged)
     # ─────────────────────────────────────────────────────────────────────────
 
     def _handle_set_orbit(self, action: SetOrbitAction) -> tuple:
-        """
-        Planning action — agent declares intended orbit. Does not consume fuel.
-        Gives a small positive reward to encourage planning.
-        """
+        """Planning action — agent declares intended orbit. Does not consume fuel."""
         msg = (
             f"Planned orbit: altitude={action.altitude_km:.1f} km, "
             f"e={action.eccentricity:.3f}, inc={action.inclination_deg:.1f}°"
@@ -265,11 +401,7 @@ class OrbitEnvironment:
         action_dict: dict,
         prev_state_dict: dict,
     ) -> tuple:
-        """
-        Execute a thruster burn — the core physics action.
-        Updates current_orbit using apply_burn(), tracks Δ-v usage.
-        """
-        # Check if this burn would exceed the budget
+        """Execute a thruster burn — the legacy low-level physics action."""
         if self._state.delta_v_used + action.delta_v_ms > self._state.delta_v_budget:
             overage = (self._state.delta_v_used + action.delta_v_ms) - self._state.delta_v_budget
             msg = (
@@ -284,7 +416,6 @@ class OrbitEnvironment:
             }
             return -0.20, False, info, msg
 
-        # Apply the burn to compute new orbital parameters
         new_orbit_dict = apply_burn(
             current_orbit = self._state.current_orbit.model_dump(),
             delta_v_ms    = action.delta_v_ms,
@@ -293,7 +424,6 @@ class OrbitEnvironment:
             normal        = action.normal,
         )
 
-        # Update state
         self._state.current_orbit  = OrbitalState(**new_orbit_dict)
         self._state.delta_v_used  += action.delta_v_ms
         self._state.trajectory.append(self._state.current_orbit)
@@ -306,7 +436,6 @@ class OrbitEnvironment:
             "result_altitude_km": self._state.current_orbit.altitude_km,
         })
 
-        # Dense step reward — how good was this burn?
         new_state_dict = self._state.model_dump()
         reward = compute_step_reward(prev_state_dict, action_dict, new_state_dict)
 
@@ -329,10 +458,7 @@ class OrbitEnvironment:
         return reward, False, info, msg
 
     def _handle_set_flyby(self, action: SetFlybyAction) -> tuple:
-        """
-        Plan a gravity assist maneuver. Only meaningful for asteroid mission.
-        Gives a bonus reward to encourage advanced mission planning.
-        """
+        """Plan a gravity assist maneuver."""
         available = self._task.get("available_flybys", [])
         if action.body not in available:
             msg = (
@@ -362,10 +488,7 @@ class OrbitEnvironment:
         return 0.05, False, info, msg
 
     def _handle_run_simulation(self) -> tuple:
-        """
-        Preview the current mission score without submitting.
-        Encourages the agent to evaluate its trajectory before committing.
-        """
+        """Preview the current mission score without submitting."""
         current_score = self._preview_score()
         self._state.current_score = current_score
 
@@ -399,10 +522,7 @@ class OrbitEnvironment:
         return 0.02, False, info, msg
 
     def _handle_submit_mission(self) -> tuple:
-        """
-        Final action — grade the mission and end the episode.
-        Terminal reward = final score (0.0–1.0).
-        """
+        """Final action — grade the mission and end the episode."""
         grade = grade_mission(self._state.task_id, self._state.model_dump())
 
         self._state.current_score   = grade["score"]
@@ -421,8 +541,6 @@ class OrbitEnvironment:
             "grade_result": grade,
             "message":      msg,
         }
-
-        # Terminal reward is the raw score — agent earns what it deserves
         return grade["score"], True, info, msg
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -430,16 +548,12 @@ class OrbitEnvironment:
     # ─────────────────────────────────────────────────────────────────────────
 
     def _handle_timeout(self, current_reward: float, current_info: dict) -> tuple:
-        """
-        Called when step_index reaches max_steps without SubmitMission.
-        Auto-grades and applies a 20% timeout penalty on the terminal reward.
-        """
+        """Auto-grade on timeout with 20% penalty."""
         grade = grade_mission(self._state.task_id, self._state.model_dump())
 
         self._state.current_score   = grade["score"]
         self._state.mission_success = grade["mission_success"]
 
-        # 20% penalty for not submitting voluntarily
         timeout_reward = grade["score"] * 0.80
 
         current_info.update({
@@ -454,11 +568,52 @@ class OrbitEnvironment:
         return True, timeout_reward, current_info
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Internal Helpers
+    # Observation Builder (ENRICHED in v2.0)
     # ─────────────────────────────────────────────────────────────────────────
 
     def _build_observation(self, last_action_result: Optional[str] = None) -> Observation:
-        """Construct an Observation from the current internal state."""
+        """
+        Construct an enriched Observation from the current internal state.
+        Includes available maneuvers, mission analysis, and recommendations.
+        """
+        current_orbit_dict = self._state.current_orbit.model_dump()
+        target_orbit_dict  = self._task["target_orbit"]
+        delta_v_remaining  = self._state.delta_v_budget - self._state.delta_v_used
+
+        # ── Build available maneuvers list ──
+        raw_maneuvers = get_available_maneuvers(
+            current_orbit   = current_orbit_dict,
+            target_orbit    = target_orbit_dict,
+            delta_v_remaining = delta_v_remaining,
+            task_id         = self._state.task_id,
+        )
+        available_maneuvers = [AvailableManeuver(**m) for m in raw_maneuvers]
+
+        # ── Build mission analysis ──
+        raw_analysis = compute_mission_analysis(
+            current_orbit  = current_orbit_dict,
+            target_orbit   = target_orbit_dict,
+            delta_v_used   = self._state.delta_v_used,
+            delta_v_budget = self._state.delta_v_budget,
+            task_id        = self._state.task_id,
+        )
+        mission_analysis = MissionAnalysis(**raw_analysis)
+
+        # ── Build recommendations ──
+        recommendations = get_recommendations(
+            current_orbit   = current_orbit_dict,
+            target_orbit    = target_orbit_dict,
+            delta_v_remaining = delta_v_remaining,
+            task_id         = self._state.task_id,
+            step_index      = self._state.step_index,
+            max_steps       = self._state.max_steps,
+        )
+
+        # Include maneuver hints from task config on first observation
+        if self._state.step_index == 0:
+            hints = self._task.get("maneuver_hints", [])
+            recommendations = hints + recommendations
+
         return Observation(
             task_id             = self._state.task_id,
             task_name           = self._task["name"],
@@ -471,9 +626,12 @@ class OrbitEnvironment:
             max_steps           = self._state.max_steps,
             mission_status      = "in_progress",
             last_action_result  = last_action_result,
+            available_maneuvers = available_maneuvers,
+            mission_analysis    = mission_analysis,
+            recommendations     = recommendations,
         )
 
     def _preview_score(self) -> float:
-        """Calculate the current score without modifying state or ending the episode."""
+        """Calculate the current score without ending the episode."""
         result = grade_mission(self._state.task_id, self._state.model_dump())
         return result["score"]

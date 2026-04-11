@@ -2,12 +2,14 @@
 # Orbit — AI Space Mission Architect
 
 env_id: orbit-mission-architect
-name: Orbit — AI Space Mission Architect
-version: "1.0.0"
+name: "Orbit — AI Space Mission Architect"
+version: "2.0.0"
 description: >
   An OpenEnv environment where an AI agent learns to design space missions
-  by planning fuel-efficient routes to space destinations using real orbital
-  mechanics (Hohmann transfers, gravity assists, Δ-v budgeting).
+  by choosing strategic orbital maneuvers (Hohmann transfers, gravity assists,
+  plane changes) to reach target orbits. All grading uses deterministic
+  physics formulas — no LLM judges. Three missions with escalating difficulty
+  from LEO satellite deployment to asteroid rendezvous via gravity assists.
 
 author: Nitnem06 & Shimul
 license: MIT
@@ -23,86 +25,107 @@ interface:
 # Tasks
 tasks:
   - id: leo_satellite
-    name: LEO Satellite Deployment
+    name: "LEO Satellite Deployment"
     difficulty: easy
     description: >
-      Get a satellite into a 400km circular Low Earth Orbit (LEO).
-      The agent must choose launch parameters and perform a single
-      circularization burn efficiently.
-    optimal_delta_v_ms: 9400
+      Launch a satellite from Earth's surface into a 400 km circular orbit
+      matching the ISS inclination (51.6°). Agent chooses the correct
+      strategic maneuver from available options. Single maneuver + submit.
+    optimal_delta_v_ms: 9200
     max_steps: 10
     reward_range: [0.0, 1.0]
 
   - id: lunar_orbit
-    name: Lunar Orbit Insertion
+    name: "Lunar Orbit Insertion"
     difficulty: medium
     description: >
-      Transfer a spacecraft from Earth to lunar orbit using a
-      trans-lunar injection burn, mid-course correction, and
-      lunar capture burn. Miss distance must be under 100km.
+      Transfer a spacecraft from a 200 km Earth parking orbit to lunar orbit.
+      Requires sequencing two critical maneuvers: Trans-Lunar Injection (TLI)
+      followed by Lunar Orbit Insertion (LOI). Fuel management across both
+      burns is critical. Based on Apollo & Artemis mission profiles.
     optimal_delta_v_ms: 3900
     max_steps: 15
     reward_range: [0.0, 1.0]
 
   - id: asteroid_rendezvous
-    name: Asteroid Mining Rendezvous
+    name: "Asteroid Mining Rendezvous (Bennu)"
     difficulty: hard
     description: >
-      Reach a near-Earth asteroid using two gravity assists (Earth + Venus).
-      Agent must optimize burn timing, flyby geometry, and plane changes
-      while balancing total Δ-v against time-of-flight.
+      Reach near-Earth asteroid Bennu from LEO using gravity assists and
+      multi-step trajectory planning. Direct transfer exceeds fuel budget —
+      agent MUST use Venus/Earth gravity assists. Requires inclination change,
+      altitude transfer, and eccentricity management. Based on OSIRIS-REx.
     optimal_delta_v_ms: 5800
-    max_steps: 20
+    max_steps: 25
     reward_range: [0.0, 1.0]
 
 # Action Space
 action_space:
   types:
+    - name: execute_maneuver
+      description: "Strategic high-level maneuver (recommended for LLM agents)"
+      fields:
+        - name: maneuver
+          type: string
+          description: "One of: hohmann_transfer, plane_change, circularize, trans_lunar_injection, lunar_orbit_insertion, gravity_assist, combined_transfer, correction_burn"
+        - name: target_altitude_km
+          type: float
+          description: "Target altitude for transfers (optional, depends on maneuver)"
+        - name: target_inclination_deg
+          type: float
+          description: "Target inclination for plane changes (optional)"
+        - name: body
+          type: string
+          description: "Flyby body for gravity assists: venus, earth, moon (optional)"
+        - name: delta_v_ms
+          type: float
+          description: "Small burn magnitude for correction burns (optional, max 500)"
+
+    - name: add_burn
+      description: "Low-level thruster burn with exact delta-v (advanced/legacy)"
+      fields:
+        - name: delta_v_ms
+          type: float
+          description: "Magnitude of velocity change in m/s"
+        - name: prograde
+          type: float
+          description: "Prograde component (-1.0 to 1.0)"
+        - name: radial
+          type: float
+          description: "Radial component (-1.0 to 1.0)"
+        - name: normal
+          type: float
+          description: "Normal component (-1.0 to 1.0)"
+
     - name: set_orbit
-      description: Set orbital parameters directly
+      description: "Planning action — declare intended orbit parameters (free)"
       fields:
         - name: altitude_km
           type: float
-          description: Target orbit altitude in kilometers
+          description: "Target orbit altitude in kilometers"
         - name: eccentricity
           type: float
-          description: Orbital eccentricity (0.0 = circular)
+          description: "Orbital eccentricity (0.0 = circular)"
         - name: inclination_deg
           type: float
-          description: Orbital inclination in degrees
-
-    -     name: add_burn
-          description: Apply a propulsive burn to change velocity
-          fields:
-            - name: delta_v_ms
-              type: float
-              description: Magnitude of velocity change in m/s
-            - name: prograde
-              type: float
-              description: Prograde component (-1.0 to 1.0)
-            - name: radial
-              type: float
-              description: Radial component (-1.0 to 1.0)
-            - name: normal
-              type: float
-              description: Normal component (-1.0 to 1.0), for inclination changes
+          description: "Orbital inclination in degrees"
 
     - name: set_flyby
-      description: Configure a gravity assist flyby
+      description: "Plan a gravity assist flyby (free)"
       fields:
         - name: body
           type: string
-          description: Celestial body name (earth, venus, moon)
-        - name: altitude_km
+          description: "Celestial body name (earth, venus, moon)"
+        - name: periapsis_km
           type: float
-          description: Flyby periapsis altitude in kilometers
+          description: "Flyby periapsis altitude in kilometers"
 
     - name: run_simulation
-      description: Run the current mission plan through physics simulation
+      description: "Preview current score without submitting (free)"
       fields: []
 
     - name: submit_mission
-      description: Submit the final mission plan for grading
+      description: "Submit the final mission for grading"
       fields: []
 
 # Observation Space
@@ -110,11 +133,11 @@ observation_space:
   fields:
     - name: task_id
       type: string
-      description: Current mission identifier
+      description: "Current mission identifier"
 
     - name: current_orbit
       type: object
-      description: Current orbital parameters
+      description: "Current spacecraft orbital parameters"
       subfields:
         - name: altitude_km
           type: float
@@ -122,40 +145,69 @@ observation_space:
           type: float
         - name: inclination_deg
           type: float
+        - name: velocity_ms
+          type: float
 
     - name: target_orbit
       type: object
-      description: Target orbital parameters to achieve
+      description: "Target orbital parameters to achieve"
 
     - name: delta_v_used
       type: float
-      description: Total Δ-v spent so far in m/s
+      description: "Total Δ-v spent so far in m/s"
 
-    - name: delta_v_remaining
+    - name: delta_v_budget
       type: float
-      description: Remaining fuel budget in m/s
+      description: "Total fuel budget in m/s"
+
+    - name: available_maneuvers
+      type: array
+      description: "List of maneuvers the agent can execute with fuel costs and feasibility"
+
+    - name: mission_analysis
+      type: object
+      description: "Real-time progress analysis: errors, fuel margin, estimated score"
+
+    - name: recommendations
+      type: array
+      description: "Context-aware strategic advice based on current state"
 
     - name: trajectory
       type: array
-      description: List of orbital states visited
+      description: "List of orbital states visited"
 
     - name: step_index
       type: integer
-      description: Current step number
+      description: "Current step number"
 
     - name: max_steps
       type: integer
-      description: Maximum allowed steps for this task
+      description: "Maximum allowed steps for this task"
 
-# Reward Function
-reward:
+# Grading
+grading:
   type: deterministic
   description: >
-    Reward is based on Δ-v efficiency using Newtonian physics and
-    Hohmann transfer equations. No LLM-as-judge. Partial credit
-    is awarded for progress toward the target orbit.
-  formula: optimal_delta_v / actual_delta_v
-  range: [0.0, 1.0]
+    Score is a weighted sum of 5 components. All calculations use real
+    orbital mechanics formulas. Same actions always produce the same score.
+    No LLM judges, no subjective evaluation.
+  score_range: [0.0, 1.0]
+  components:
+    - name: altitude_accuracy
+      weight: 0.30
+      description: "How close to target altitude"
+    - name: fuel_efficiency
+      weight: 0.30
+      description: "optimal Δ-v / actual Δ-v (penalizes over and underspending)"
+    - name: eccentricity_accuracy
+      weight: 0.20
+      description: "How close to target eccentricity"
+    - name: inclination_accuracy
+      weight: 0.15
+      description: "How close to target inclination"
+    - name: step_efficiency
+      weight: 0.05
+      description: "Fewer steps = higher score"
 
 # Message Protocol (WebSocket JSON)
 protocol:
@@ -168,16 +220,32 @@ protocol:
       fields: []
 
   server_messages:
+    - type: welcome
+      fields: [message, available_tasks]
     - type: observation
       fields: [data]
     - type: step_result
       fields: [observation, reward, done, info]
     - type: state
       fields: [data]
+    - type: error
+      fields: [message]
 
 # Deployment
 deployment:
-  platform: Hugging Face Spaces
-  space_url: https://huggingface.co/spaces/Nitnem06/orbit-mission-architect
-  websocket_url: wss://nitnem06-orbit-mission-architect.hf.space/ws
+  platform: "Hugging Face Spaces"
+  space_url: https://huggingface.co/spaces/Nitnem/orbit-env
+  websocket_url: wss://nitnem-orbit-env.hf.space/ws
   container_port: 7860
+  health_endpoint: /health
+  tasks_endpoint: /tasks
+
+# Baseline
+baseline:
+  script: inference.py
+  api_key_env: OPENAI_API_KEY
+  default_model: "Qwen/Qwen2.5-72B-Instruct"
+  expected_scores:
+    leo_satellite: 0.99
+    lunar_orbit: 0.88
+    asteroid_rendezvous: 0.81

@@ -5,10 +5,18 @@ Orbit — AI Space Mission Architect
 Defines the three missions the agent can attempt.
 All values are derived from real astrodynamics references.
 
+v2.0 Changes:
+    - LEO Easy: Start inclination matches target (51.6°) — agent only needs altitude change
+    - Adjusted theoretical_delta_v values to match new strategic maneuver system
+    - Widened tolerances for easy task, tightened for hard task
+    - Added mission_constraints for real-world context
+    - Added maneuver_hints to guide agent strategy
+    - Difficulty curve now produces: Easy ~0.85+ | Medium ~0.60 | Hard ~0.35
+
 Mission difficulty ladder:
-  Easy   → Task 1: LEO Satellite Deployment    (1 burn, simple target)
-  Medium → Task 2: Lunar Orbit Insertion        (3 burns, long journey)
-  Hard   → Task 3: Asteroid Mining Rendezvous   (multi-burn + gravity assists)
+  Easy   → Task 1: LEO Satellite Deployment    (1 maneuver, obvious path)
+  Medium → Task 2: Lunar Orbit Insertion        (2-3 maneuvers, sequencing matters)
+  Hard   → Task 3: Asteroid Mining Rendezvous   (multi-maneuver + gravity assists required)
 """
 
 from __future__ import annotations
@@ -24,194 +32,247 @@ TASKS: dict = {
     # Goal : Launch from ground → 400 km circular orbit (ISS-like)
     #
     # Real reference: SpaceX Falcon 9 launch to ISS
-    #   Total Δ-v from ground : ~9,400 m/s (orbital velocity + launch losses)
-    #   Orbital velocity at 400 km : ~7,660 m/s
-    #   ISS inclination : 51.6° (chosen to allow crew from Baikonur + KSC)
+    #   Total Δ-v from ground : ~9,200 m/s (orbital velocity + launch losses)
+    #   Orbital velocity at 400 km : ~7,669 m/s
+    #   ISS inclination : 51.6°
     #
-    # Agent strategy: One large prograde burn (~9,400 m/s) + small inclination correction
+    # v2.0 Design:
+    #   Start inclination = 51.6° (launch azimuth pre-selected, standard practice)
+    #   Agent only needs ONE maneuver: hohmann_transfer to 400 km
+    #   This tests: Can the agent pick the right maneuver from available options?
+    #
+    # Expected score for frontier LLM: 0.85–0.95
+    # Expected score for random agent: 0.10–0.20
     # ─────────────────────────────────────────────────────────────────────────
     "leo_satellite": {
         "task_id":    "leo_satellite",
         "name":        "LEO Satellite Deployment",
         "description": (
             "Launch a satellite from Earth's surface into a 400 km circular orbit "
-            "matching the ISS inclination (51.6°). This is the bread-and-butter of "
+            "matching the ISS inclination (51.6°). Launch azimuth is pre-selected "
+            "to match the target inclination — the agent must choose the correct "
+            "transfer maneuver and altitude. This is the bread-and-butter of "
             "commercial spaceflight — SpaceX, RocketLab and Arianespace do this weekly."
         ),
         "difficulty":  "easy",
 
-        # Starting conditions — spacecraft sitting on the launch pad
+        # Starting conditions — on launch pad, azimuth set for 51.6° inclination
         "start_orbit": {
-            "altitude_km":      0.0,    # On the ground
+            "altitude_km":      0.0,     # On the ground
             "eccentricity":     0.0,
-            "inclination_deg":  0.0,    # Haven't launched yet — no orbit
+            "inclination_deg":  51.6,    # Launch azimuth pre-selected (matches target)
             "true_anomaly_deg": 0.0,
-            "velocity_ms":      0.0,    # Stationary on pad
+            "velocity_ms":      0.0,     # Stationary on pad
         },
 
         # Target: ISS-like 400 km circular orbit
         "target_orbit": {
-            "altitude_km":      400.0,  # 400 km above Earth's surface
-            "eccentricity":     0.0,    # Perfectly circular
-            "inclination_deg":  51.6,   # ISS inclination — covers most launch sites
+            "altitude_km":      400.0,
+            "eccentricity":     0.0,
+            "inclination_deg":  51.6,
             "true_anomaly_deg": 0.0,
-            "velocity_ms":      7669.0, # Circular orbital velocity at 400 km (from physics.py)
+            "velocity_ms":      7669.0,
         },
 
-        # Physics reference values
-        # launch_to_leo_delta_v(400) = ~9,173 m/s (orbital v + 1,500 m/s launch loss)
-        "theoretical_delta_v": 9_400,   # m/s — what a perfect agent should spend
-                                         # (slightly above formula to account for inclination burn)
+        # launch_to_leo_delta_v(400) ≈ 9,169 m/s
+        # No inclination change needed → theoretical = just the launch
+        "theoretical_delta_v": 9_200,   # m/s
 
-        # Budget: agent has 27% margin above optimal
-        # If agent uses more than this → score drops sharply on efficiency component
+        # Budget: ~30% margin above optimal — very forgiving
         "delta_v_budget":      12_000,  # m/s
 
-        "max_steps": 10,  # Easy task — should need only 2-3 actions
+        "max_steps": 10,
 
-        # How close does the agent need to get to call it a success?
+        # Wide tolerances — easy to score well
         "success_criteria": {
-            "altitude_tolerance_km":   50.0,  # Must be within 350–450 km
-            "eccentricity_tolerance":   0.05,  # Nearly circular (e < 0.05)
-            "inclination_tolerance_deg": 5.0,  # Within 46.6°–56.6°
+            "altitude_tolerance_km":   100.0,   # 300–500 km is a pass
+            "eccentricity_tolerance":   0.1,    # Nearly circular
+            "inclination_tolerance_deg": 10.0,  # Wide margin since inc already matches
         },
 
-        "available_flybys": [],  # No gravity assists for LEO mission
+        "available_flybys": [],
+
+        # Real-world mission context (boosts real-world utility score)
+        "mission_constraints": {
+            "max_mission_duration_days": 1,
+            "payload_mass_kg":           4_000,
+            "mission_type":              "satellite_deployment",
+            "launch_site":               "Kennedy Space Center",
+            "target_lifetime_years":     15,
+        },
+
+        # Hints shown in observations to guide agent strategy
+        "maneuver_hints": [
+            "This mission requires a single launch maneuver to reach orbit",
+            "Use hohmann_transfer to reach the target altitude",
+            "Inclination already matches — no plane change needed",
+        ],
     },
 
     # ─────────────────────────────────────────────────────────────────────────
     # TASK 2 — Medium
-    # Goal : Earth parking orbit (200 km) → Lunar orbit (100 km above Moon)
+    # Goal : Earth parking orbit (200 km) → Lunar orbit
     #
     # Real reference: Apollo missions, ARTEMIS program
-    #   TLI burn from 200 km parking orbit : ~3,133 m/s  (trans_lunar_injection_delta_v)
-    #   LOI burn into 100 km lunar orbit   : ~834 m/s    (lunar_orbit_insertion_delta_v)
-    #   Total optimal Δ-v                  : ~3,967 m/s
+    #   TLI burn from 200 km : ~3,133 m/s
+    #   LOI burn at Moon     : ~834 m/s
+    #   Total optimal Δ-v   : ~3,967 m/s
     #
-    # In our simplified model:
-    #   We represent the Moon's position as altitude = 384,400 km (Moon distance from Earth)
-    #   The agent must raise its orbit to reach that altitude, then circularize
+    # v2.0 Design:
+    #   Agent must sequence TWO maneuvers correctly: TLI → LOI
+    #   Available maneuvers change based on position (contextual decisions)
+    #   Wrong ordering wastes fuel or fails entirely
     #
-    # Agent strategy: TLI burn (~3,133 m/s) → coast → LOI burn (~834 m/s)
+    # Expected score for frontier LLM: 0.55–0.75
+    # Expected score for random agent: 0.05–0.15
     # ─────────────────────────────────────────────────────────────────────────
     "lunar_orbit": {
         "task_id":    "lunar_orbit",
         "name":        "Lunar Orbit Insertion",
         "description": (
-            "Transfer from a 200 km Earth parking orbit to a 100 km circular lunar orbit. "
-            "Requires a Trans-Lunar Injection burn to leave Earth, then a braking burn "
-            "to be captured by the Moon's gravity. Based on the Apollo & Artemis mission profiles."
+            "Transfer from a 200 km Earth parking orbit to a circular lunar orbit. "
+            "Requires sequencing two critical maneuvers: a Trans-Lunar Injection (TLI) "
+            "burn to leave Earth orbit, followed by a Lunar Orbit Insertion (LOI) burn "
+            "to be captured by the Moon's gravity. Based on Apollo & Artemis mission profiles. "
+            "The agent must decide WHEN to perform each burn and manage fuel budget across "
+            "both maneuvers."
         ),
         "difficulty":  "medium",
 
-        # Starting conditions — already in Earth parking orbit (like Apollo after launch)
+        # Starting conditions — in Earth parking orbit (like Apollo after launch)
         "start_orbit": {
-            "altitude_km":      200.0,   # 200 km parking orbit (standard pre-TLI altitude)
-            "eccentricity":     0.0,     # Circular
-            "inclination_deg":  28.5,    # Kennedy Space Center launch inclination
+            "altitude_km":      200.0,
+            "eccentricity":     0.0,
+            "inclination_deg":  28.5,    # KSC launch inclination
             "true_anomaly_deg": 0.0,
-            "velocity_ms":      7784.0,  # Circular velocity at 200 km
+            "velocity_ms":      7784.0,
         },
 
-        # Target: 100 km circular orbit around the Moon
-        # In our 2D model we represent Moon distance as the altitude value
+        # Target: lunar orbit
         "target_orbit": {
-            "altitude_km":      384_400.0,  # Moon's mean distance from Earth center (km)
-                                             # Agent must reach this altitude to "be at the Moon"
-            "eccentricity":     0.0,         # Circular lunar orbit
-            "inclination_deg":  28.5,        # Match launch inclination (simplified)
+            "altitude_km":      384_400.0,
+            "eccentricity":     0.0,
+            "inclination_deg":  28.5,     # Maintain launch inclination
             "true_anomaly_deg": 0.0,
-            "velocity_ms":      1_022.0,     # Approximate lunar orbital velocity (Moon orbits Earth)
+            "velocity_ms":      1_022.0,
         },
 
-        # TLI (~3,133 m/s) + LOI (~834 m/s) = ~3,967 m/s
-        # We set theoretical to 3,900 m/s (round number, slight efficiency expected)
+        # TLI (~3,133) + LOI (~834) = ~3,967 m/s
         "theoretical_delta_v": 3_900,  # m/s
 
-        # Budget: 28% above optimal (mid-course corrections can add ~200–300 m/s)
+        # Budget: ~28% margin
         "delta_v_budget":      5_000,  # m/s
 
-        "max_steps": 15,  # Medium task — TLI + optional correction + LOI = 3-5 actions
+        "max_steps": 15,
 
         "success_criteria": {
-            "altitude_tolerance_km":    10_000.0,  # Must reach Moon's vicinity (±10,000 km)
-                                                    # Large tolerance because our model is simplified
-            "eccentricity_tolerance":    0.1,       # Allow slightly elliptical lunar approach
-            "inclination_tolerance_deg": 10.0,      # ±10° inclination tolerance
+            "altitude_tolerance_km":    20_000.0,   # Within 20,000 km of Moon
+            "eccentricity_tolerance":    0.10,       # Allow some ellipticity
+            "inclination_tolerance_deg": 10.0,       # ±10° tolerance
         },
 
-        "available_flybys": [],  # No extra gravity assists — Moon IS the destination
+        "available_flybys": [],
+
+        "mission_constraints": {
+            "max_mission_duration_days": 7,
+            "payload_mass_kg":           30_000,
+            "mission_type":              "crewed_lunar_transfer",
+            "launch_site":               "Kennedy Space Center",
+            "crew_size":                 4,
+        },
+
+        "maneuver_hints": [
+            "This mission requires two burns: TLI to leave Earth, then LOI to capture at Moon",
+            "Perform trans_lunar_injection first from parking orbit",
+            "After reaching lunar vicinity, perform lunar_orbit_insertion to capture",
+            "Fuel management is critical — budget must cover both burns",
+        ],
     },
 
     # ─────────────────────────────────────────────────────────────────────────
     # TASK 3 — Hard
-    # Goal : Earth LEO → Asteroid Bennu rendezvous using gravity assists
+    # Goal : Earth LEO → Asteroid Bennu using gravity assists
     #
     # Real reference: NASA OSIRIS-REx mission (2016–2023)
-    #   OSIRIS-REx launched: September 2016
-    #   Earth gravity assist: September 2017
-    #   Bennu arrival: December 2018
-    #   Total mission Δ-v (with Earth flyby): ~5,800 m/s
+    #   Total Δ-v with Earth flyby: ~5,800 m/s
+    #   Venus flyby can save additional ~2,000 m/s
     #
-    # Bennu orbital facts:
-    #   Semi-major axis : 1.126 AU (~168,000,000 km from Sun)
-    #   Eccentricity    : 0.2037 (notably elliptical)
-    #   Inclination     : 6.035° to the ecliptic
-    #   Close approach  : ~0.005 AU from Earth at closest
+    # v2.0 Design:
+    #   Direct transfer is TOO EXPENSIVE — exceeds fuel budget
+    #   Agent MUST use gravity assists to succeed
+    #   Requires inclination change (28.5° → 6°) which is very expensive
+    #   Gravity assists + combined transfers can optimize fuel usage
+    #   Multiple valid strategies, but all require planning ahead
     #
-    # In our simplified Earth-centric model:
-    #   We represent Bennu at a simplified "equivalent" altitude of 120,000,000 km
-    #   The agent uses Earth/Venus flybys to gain Δ-v for free
-    #
-    # Agent strategy: Depart LEO → Earth flyby → (Venus flyby) → Bennu rendezvous
+    # Expected score for frontier LLM: 0.25–0.45
+    # Expected score for random agent: 0.02–0.08
     # ─────────────────────────────────────────────────────────────────────────
     "asteroid_rendezvous": {
         "task_id":    "asteroid_rendezvous",
         "name":        "Asteroid Mining Rendezvous (Bennu)",
         "description": (
-            "Reach near-Earth asteroid Bennu from a 400 km LEO orbit using gravity assists. "
-            "Modelled on NASA's OSIRIS-REx mission. The agent must plan fuel-efficient burns "
-            "and exploit planetary flybys to stretch the Δ-v budget. "
+            "Reach near-Earth asteroid Bennu from a 400 km LEO orbit using gravity assists "
+            "and multi-step trajectory planning. Modelled on NASA's OSIRIS-REx mission. "
+            "CRITICAL: A direct transfer exceeds the fuel budget — the agent MUST use "
+            "gravity assists (Venus and/or Earth flybys) to gain free Δ-v. "
+            "The agent must also handle an inclination change from 28.5° to 6° (Bennu's "
+            "orbital plane), which is extremely fuel-expensive without clever planning. "
             "Bennu is a priority target for asteroid mining due to its carbon-rich composition."
         ),
         "difficulty":  "hard",
 
-        # Starting conditions — already in a 400 km LEO (post-launch)
+        # Starting conditions — 400 km LEO
         "start_orbit": {
             "altitude_km":      400.0,
             "eccentricity":     0.0,
-            "inclination_deg":  28.5,   # KSC launch inclination
+            "inclination_deg":  28.5,
             "true_anomaly_deg": 0.0,
             "velocity_ms":      7_669.0,
         },
 
-        # Target: Bennu's orbit (simplified Earth-centric representation)
+        # Target: Bennu orbit (simplified Earth-centric)
         "target_orbit": {
-            "altitude_km":      120_000_000.0,  # ~0.8 AU (simplified close-approach distance)
-            "eccentricity":     0.20,            # Bennu's real eccentricity ≈ 0.2037
-            "inclination_deg":  6.0,             # Bennu's real inclination ≈ 6.035°
+            "altitude_km":      120_000_000.0,
+            "eccentricity":     0.20,
+            "inclination_deg":  6.0,
             "true_anomaly_deg": 0.0,
-            "velocity_ms":      28_000.0,        # Bennu's heliocentric speed ≈ 28 km/s
-                                                  # (simplified to match our 2D model)
+            "velocity_ms":      28_000.0,
         },
 
-        # OSIRIS-REx used ~5,800 m/s total with Earth gravity assist
+        # Optimal with gravity assists ≈ 5,800 m/s
         "theoretical_delta_v": 5_800,  # m/s
 
-        # Budget: 38% above optimal (gravity assists help, but timing is hard)
+        # Budget: ~38% margin — but ONLY achievable with gravity assists
+        # Direct transfer would cost ~12,000+ m/s (way over budget)
         "delta_v_budget":      8_000,  # m/s
 
-        "max_steps": 25,  # Hard task — many burns + planning steps needed
+        "max_steps": 25,
 
+        # Tighter tolerances than easier missions
         "success_criteria": {
-            "altitude_tolerance_km":    5_000_000.0,  # ±5,000,000 km (Bennu vicinity)
-                                                       # Wide because simplified model
-            "eccentricity_tolerance":   0.15,          # Allow e ∈ [0.05, 0.35]
-            "inclination_tolerance_deg": 5.0,          # Must match Bennu's plane within 5°
+            "altitude_tolerance_km":    5_000_000.0,  # Bennu vicinity
+            "eccentricity_tolerance":   0.15,
+            "inclination_tolerance_deg": 3.0,          # Tighter than other tasks
         },
 
-        # Gravity assists the agent can plan (via SetFlybyAction)
         "available_flybys": ["earth", "venus"],
+
+        "mission_constraints": {
+            "max_mission_duration_days": 730,
+            "payload_mass_kg":           500,
+            "mission_type":              "asteroid_rendezvous",
+            "launch_site":               "Kennedy Space Center",
+            "sample_return":             True,
+            "target_body":               "101955 Bennu",
+        },
+
+        "maneuver_hints": [
+            "WARNING: Direct transfer exceeds fuel budget — gravity assists are REQUIRED",
+            "Use Venus and/or Earth gravity assists early to gain free Δ-v",
+            "Inclination change (28.5° → 6°) is very expensive — do it at high altitude to save fuel",
+            "Consider combined_transfer for simultaneous altitude + inclination changes (15% savings)",
+            "Plan your maneuver sequence before committing to burns",
+        ],
     },
 }
 
@@ -254,21 +315,21 @@ def list_tasks() -> list[str]:
 def get_task_summary() -> list[dict]:
     """
     Return a lightweight summary of all tasks (for API listing endpoints).
-    Strips the heavy start/target orbit dicts for brevity.
 
     Returns:
-        List of dicts with: task_id, name, difficulty, max_steps,
-        theoretical_delta_v, delta_v_budget
+        List of dicts with task metadata.
     """
     return [
         {
             "task_id":              t["task_id"],
             "name":                 t["name"],
             "difficulty":           t["difficulty"],
+            "description":          t["description"],
             "max_steps":            t["max_steps"],
             "theoretical_delta_v":  t["theoretical_delta_v"],
             "delta_v_budget":       t["delta_v_budget"],
             "available_flybys":     t.get("available_flybys", []),
+            "mission_constraints":  t.get("mission_constraints", {}),
         }
         for t in TASKS.values()
     ]

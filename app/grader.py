@@ -4,6 +4,12 @@ Orbit — AI Space Mission Architect
 
 Deterministic scoring for completed missions and dense step rewards.
 
+v2.0 Changes:
+    - Updated compute_step_reward() to handle execute_maneuver actions
+    - Added rewards for strategic maneuver usage (hohmann, TLI, LOI, gravity assist)
+    - Step rewards now also track inclination + eccentricity progress (not just altitude)
+    - Terminal grading (grade_mission) unchanged — already deterministic and correct
+
 Scoring philosophy:
   - All scoring is 100% deterministic — same inputs always produce the same score.
   - Scores are broken into weighted components so agents get meaningful signal.
@@ -98,8 +104,6 @@ def grade_mission(task_id: str, state: dict) -> Dict:
     # ── Raw scores (0.0–1.0 each, before weighting) ───────────────────────────
 
     # 1. Altitude accuracy
-    #    Uses log-scale proximity for large-range missions (Moon, Bennu)
-    #    so the agent isn't penalised linearly over 120,000,000 km.
     alt_tolerance = criteria["altitude_tolerance_km"]
     alt_raw = _altitude_score(alt, t_alt, alt_tolerance)
 
@@ -115,7 +119,6 @@ def grade_mission(task_id: str, state: dict) -> Dict:
     inc_raw = proximity_score(inc, t_inc, inc_tolerance)
 
     # 5. Step efficiency — reward finishing faster than the step limit
-    #    Score = 1.0 if done in 1 step, 0.0 if used all steps
     step_raw = max(0.0, 1.0 - (steps_used / max(max_steps, 1)))
 
     raw_scores = {
@@ -136,7 +139,6 @@ def grade_mission(task_id: str, state: dict) -> Dict:
     total_score = round(max(0.0, min(1.0, total_score)), 4)
 
     # ── Mission success check ─────────────────────────────────────────────────
-    #    All three orbital parameters must be within tolerance simultaneously.
     alt_error = abs(alt - t_alt)
     ecc_error = abs(ecc - t_ecc)
     inc_error = abs(inc - t_inc)
@@ -187,10 +189,16 @@ def compute_step_reward(
 
     Reward components:
       +0.10  Getting closer to target altitude (proportional to progress)
+      +0.05  Getting closer to target inclination
+      +0.03  Getting closer to target eccentricity
       -0.05  Moving further from target altitude
+      -0.03  Moving further from target inclination
       -0.005 Per 1,000 m/s of Δ-v spent (fuel penalty, always applied)
-      +0.03  Using RunSimulation (encourages planning before acting)
+      +0.03  Using RunSimulation (encourages planning)
       +0.05  Using SetFlyby (encourages gravity assist planning)
+      +0.01  Using SetOrbit (encourages committing to a plan)
+      +0.08  Using execute_maneuver with gravity_assist (free Δ-v!)
+      +0.03  Using execute_maneuver with appropriate maneuver for the task
       -0.30  Exceeding the Δ-v budget (hard penalty)
       -0.01  Per step taken (encourages step efficiency)
 
@@ -208,67 +216,117 @@ def compute_step_reward(
     task    = get_task(task_id)
     target  = task["target_orbit"]
     t_alt   = target["altitude_km"]
+    t_inc   = target["inclination_deg"]
+    t_ecc   = target["eccentricity"]
 
     reward = 0.0
 
-    # ── Altitude progress reward ───────────────────────────────────────────────
+    # ── Helper to extract orbit values from dict or Pydantic model ────────────
+    def _get_orbit_val(orbit, key, default=0.0):
+        if hasattr(orbit, key):
+            return getattr(orbit, key)
+        return orbit.get(key, default)
+
+    # ── Get previous and new orbital states ────────────────────────────────────
     prev_orbit = prev_state.get("current_orbit", {})
     new_orbit  = new_state.get("current_orbit", {})
 
-    # Support both Pydantic model and dict
-    if hasattr(prev_orbit, "altitude_km"):
-        prev_alt = prev_orbit.altitude_km
-    else:
-        prev_alt = prev_orbit.get("altitude_km", 0.0)
+    prev_alt = _get_orbit_val(prev_orbit, "altitude_km", 0.0)
+    new_alt  = _get_orbit_val(new_orbit,  "altitude_km", 0.0)
+    prev_inc = _get_orbit_val(prev_orbit, "inclination_deg", 0.0)
+    new_inc  = _get_orbit_val(new_orbit,  "inclination_deg", 0.0)
+    prev_ecc = _get_orbit_val(prev_orbit, "eccentricity", 0.0)
+    new_ecc  = _get_orbit_val(new_orbit,  "eccentricity", 0.0)
 
-    if hasattr(new_orbit, "altitude_km"):
-        new_alt = new_orbit.altitude_km
-    else:
-        new_alt = new_orbit.get("altitude_km", 0.0)
-
+    # ── Altitude progress reward ───────────────────────────────────────────────
     prev_alt_error = abs(prev_alt - t_alt)
     new_alt_error  = abs(new_alt  - t_alt)
 
-    # Scale improvement reward by how large the target altitude is
-    # (so Moon/Bennu missions get meaningful signal too)
     scale = max(t_alt, 1.0)
 
     if new_alt_error < prev_alt_error:
-        # Progress toward target — reward proportional to how much we improved
         improvement_fraction = (prev_alt_error - new_alt_error) / scale
         reward += min(0.10, improvement_fraction * 2.0)
     elif new_alt_error > prev_alt_error:
-        # Moving away from target
         regression_fraction = (new_alt_error - prev_alt_error) / scale
         reward -= min(0.05, regression_fraction * 1.0)
 
-    # ── Fuel penalty (applied to all burn actions) ─────────────────────────────
+    # ── Inclination progress reward ────────────────────────────────────────────
+    prev_inc_error = abs(prev_inc - t_inc)
+    new_inc_error  = abs(new_inc  - t_inc)
+
+    if new_inc_error < prev_inc_error - 0.01:
+        # Improved inclination
+        reward += min(0.05, (prev_inc_error - new_inc_error) / max(abs(t_inc), 1.0))
+    elif new_inc_error > prev_inc_error + 0.01:
+        # Worsened inclination
+        reward -= min(0.03, (new_inc_error - prev_inc_error) / max(abs(t_inc), 1.0))
+
+    # ── Eccentricity progress reward ──────────────────────────────────────────
+    prev_ecc_error = abs(prev_ecc - t_ecc)
+    new_ecc_error  = abs(new_ecc  - t_ecc)
+
+    if new_ecc_error < prev_ecc_error - 0.001:
+        reward += min(0.03, (prev_ecc_error - new_ecc_error) * 5.0)
+    elif new_ecc_error > prev_ecc_error + 0.001:
+        reward -= min(0.02, (new_ecc_error - prev_ecc_error) * 3.0)
+
+    # ── Action-specific rewards ────────────────────────────────────────────────
     action_type = action.get("type", "")
-    dv_spent    = action.get("delta_v_ms", 0.0)
 
-    if dv_spent > 0:
-        # Penalty: 0.005 per 1,000 m/s spent — small but accumulates
-        reward -= (dv_spent / 1_000.0) * 0.005
-
-    # ── Action-specific bonuses ────────────────────────────────────────────────
     if action_type == "run_simulation":
-        # Reward planning — agent looked before leaping
         reward += 0.03
 
     elif action_type == "set_flyby":
-        # Reward gravity assist planning (especially valuable for asteroid mission)
         reward += 0.05
 
     elif action_type == "set_orbit":
-        # Small reward for committing to a target plan
         reward += 0.01
 
+    elif action_type == "execute_maneuver":
+        maneuver = action.get("maneuver", "")
+
+        # Reward gravity assists highly — they're the smart choice (free Δ-v)
+        if maneuver == "gravity_assist":
+            reward += 0.08
+
+        # Reward using the right maneuver for the mission phase
+        elif maneuver == "trans_lunar_injection" and task_id == "lunar_orbit":
+            reward += 0.05
+
+        elif maneuver == "lunar_orbit_insertion" and task_id == "lunar_orbit":
+            reward += 0.05
+
+        elif maneuver == "hohmann_transfer":
+            reward += 0.03
+
+        elif maneuver == "combined_transfer":
+            # Combined is smarter than separate — reward the insight
+            reward += 0.04
+
+        elif maneuver == "plane_change":
+            reward += 0.02
+
+        elif maneuver == "circularize":
+            reward += 0.02
+
+        elif maneuver == "correction_burn":
+            reward += 0.01
+
+    # ── Fuel penalty (applied when Δ-v was consumed) ──────────────────────────
+    # For execute_maneuver, the delta_v is tracked in the state, not in action
+    prev_dv_used = prev_state.get("delta_v_used", 0.0)
+    new_dv_used  = new_state.get("delta_v_used", 0.0)
+    dv_spent     = new_dv_used - prev_dv_used
+
+    if dv_spent > 0:
+        reward -= (dv_spent / 1_000.0) * 0.005
+
     # ── Budget violation penalty ───────────────────────────────────────────────
-    delta_v_used   = new_state.get("delta_v_used", 0.0)
     delta_v_budget = task["delta_v_budget"]
 
-    if delta_v_used > delta_v_budget:
-        reward -= 0.30  # Hard penalty for going over budget
+    if new_dv_used > delta_v_budget:
+        reward -= 0.30
 
     # ── Per-step cost (encourages doing things in fewer steps) ────────────────
     reward -= 0.01
@@ -287,7 +345,7 @@ def _altitude_score(actual_km: float, target_km: float, tolerance_km: float) -> 
     """
     Altitude proximity score with log-scale adjustment for large-range missions.
 
-    For LEO (target = 400 km, tolerance = 50 km):
+    For LEO (target = 400 km, tolerance = 100 km):
         Linear proximity works fine — errors are small relative to target.
 
     For Lunar/Bennu (target = 384,400 km or 120,000,000 km):
@@ -307,11 +365,9 @@ def _altitude_score(actual_km: float, target_km: float, tolerance_km: float) -> 
         Score 0.0–1.0.
     """
     if target_km < 10_000.0:
-        # LEO — linear proximity is fine
         return proximity_score(actual_km, target_km, tolerance_km)
 
     # Deep space — use log-ratio scoring
-    # Score = 1.0 if exactly on target, drops as ratio diverges from 1.0
     if actual_km <= 0 or target_km <= 0:
         return 0.0
 
