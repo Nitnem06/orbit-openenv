@@ -5,10 +5,17 @@ Orbit — AI Space Mission Architect
 FastAPI WebSocket server that wraps the OrbitEnvironment.
 Each WebSocket connection gets its own isolated environment instance.
 
+v2.0 Changes:
+    - Added ExecuteManeuverAction import
+    - Updated UI scoring table to match grader weights (30/30/20/15/5)
+    - Updated Quick Start to use execute_maneuver
+    - Enriched health endpoint
+    - Updated version to 2.0.0
+
 Message Protocol:
     Client → Server:
         {"type": "reset", "task_id": "leo_satellite"}
-        {"type": "step", "action": {"type": "add_burn", "delta_v_ms": 500, ...}}
+        {"type": "step", "action": {"type": "execute_maneuver", "maneuver": "hohmann_transfer", ...}}
         {"type": "state"}
         {"type": "list_tasks"}
 
@@ -24,16 +31,18 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any, Dict
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse, HTMLResponse  # ← Added HTMLResponse
-from pydantic import TypeAdapter, ValidationError, BaseModel
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse, JSONResponse
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from app.env import OrbitEnvironment
 from app.models import (
     Action,
     AddBurnAction,
+    ExecuteManeuverAction,
     RunSimulationAction,
     SetFlybyAction,
     SetOrbitAction,
@@ -42,6 +51,7 @@ from app.models import (
 from app.tasks import get_task_summary, list_tasks
 
 env_instance: OrbitEnvironment | None = None
+START_TIME = time.time()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Logging Setup
@@ -60,7 +70,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title       = "Orbit — AI Space Mission Architect",
     description = "OpenEnv-compliant WebSocket server for orbital mechanics simulation.",
-    version     = "1.0.0",
+    version     = "2.0.0",
 )
 
 # Pydantic v2 TypeAdapter for parsing Action union
@@ -68,7 +78,7 @@ action_adapter = TypeAdapter(Action)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HTTP Endpoints (Health Check + Task Listing)
+# HTTP Endpoints
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
@@ -288,6 +298,12 @@ async def root():
                 align-items: center;
                 gap: 4px;
             }
+            .baseline-score {
+                margin-top: 8px;
+                font-size: 0.85em;
+                color: #7b2ff7;
+                font-weight: 600;
+            }
 
             /* ── API Endpoints ── */
             .api-section { margin-bottom: 44px; }
@@ -415,21 +431,23 @@ async def root():
                 <div class="subtitle">AI Space Mission Architect</div>
                 <div class="badges">
                     <span class="badge primary">OpenEnv Environment</span>
-                    <span class="badge">Reinforcement Learning</span>
+                    <span class="badge">Strategic Maneuvers</span>
                     <span class="badge">Orbital Mechanics</span>
                     <span class="badge">Deterministic Grading</span>
                 </div>
                 <div class="status-bar">
                     <div class="status-dot"></div>
-                    <span class="status-text">Environment Online</span>
+                    <span class="status-text">Environment Online — v2.0.0</span>
                 </div>
             </div>
 
             <!-- Description -->
             <p class="description">
-                An RL environment where AI agents plan space missions by choosing orbital maneuvers,
-                managing fuel budgets, and navigating trade-offs between efficiency, accuracy, and mission constraints.
-                All scoring is based on deterministic physics calculations — no LLM judges, no subjective evaluation.
+                An RL environment where AI agents plan space missions by choosing strategic orbital
+                maneuvers — Hohmann transfers, gravity assists, plane changes — while managing fuel
+                budgets and navigating trade-offs between efficiency, accuracy, and mission constraints.
+                Enriched observations provide available maneuvers, mission analysis, and recommendations
+                to enable strategic reasoning. All scoring uses deterministic physics — no LLM judges.
             </p>
 
             <!-- Missions -->
@@ -443,8 +461,8 @@ async def root():
                         <span class="difficulty easy">Easy</span>
                     </div>
                     <div class="mission-desc">
-                        Launch a satellite to a 400km circular orbit at ISS-like inclination. 
-                        Straightforward single-phase mission with generous fuel margins.
+                        Launch a satellite to a 400 km circular orbit at ISS inclination (51.6°).
+                        Single strategic maneuver with generous fuel margins. Based on SpaceX Falcon 9 missions.
                     </div>
                     <div class="mission-stats">
                         <span>🎯 400 km altitude</span>
@@ -452,6 +470,7 @@ async def root():
                         <span>⛽ 12,000 m/s budget</span>
                         <span>🔄 Max 10 steps</span>
                     </div>
+                    <div class="baseline-score">Baseline Score: 0.99</div>
                 </div>
                 <div class="mission-card">
                     <div class="mission-header">
@@ -459,8 +478,9 @@ async def root():
                         <span class="difficulty medium">Medium</span>
                     </div>
                     <div class="mission-desc">
-                        Transfer from Earth parking orbit to lunar orbit. Requires multi-burn 
-                        planning with trans-lunar injection and capture maneuvers.
+                        Transfer from Earth parking orbit to lunar orbit. Two-burn sequence:
+                        Trans-Lunar Injection → Lunar Orbit Insertion. Residual eccentricity
+                        requires trade-off decisions. Based on Apollo & Artemis.
                     </div>
                     <div class="mission-stats">
                         <span>🎯 384,400 km distance</span>
@@ -468,15 +488,17 @@ async def root():
                         <span>⛽ 5,000 m/s budget</span>
                         <span>🔄 Max 15 steps</span>
                     </div>
+                    <div class="baseline-score">Baseline Score: 0.88</div>
                 </div>
                 <div class="mission-card">
                     <div class="mission-header">
-                        <span class="mission-name">Asteroid Mining Rendezvous</span>
+                        <span class="mission-name">Asteroid Mining Rendezvous (Bennu)</span>
                         <span class="difficulty hard">Hard</span>
                     </div>
                     <div class="mission-desc">
-                        Reach asteroid Bennu using gravity assists, plane changes, and multi-step 
-                        trajectory planning. Requires strategic fuel management under tight constraints.
+                        Reach asteroid Bennu using gravity assists, plane changes, and multi-step
+                        planning. Direct transfer exceeds fuel budget — agent MUST use gravity assists.
+                        Navigation uncertainty on deep-space transfers. Based on OSIRIS-REx.
                     </div>
                     <div class="mission-stats">
                         <span>🎯 ~0.8 AU distance</span>
@@ -484,6 +506,7 @@ async def root():
                         <span>⛽ 8,000 m/s budget</span>
                         <span>🔄 Max 25 steps</span>
                     </div>
+                    <div class="baseline-score">Baseline Score: 0.81</div>
                 </div>
             </div>
 
@@ -536,12 +559,17 @@ async def root():
                 <tbody>
                     <tr>
                         <td>Altitude Accuracy</td>
-                        <td><span class="score-weight">25%</span></td>
+                        <td><span class="score-weight">30%</span></td>
                         <td>How close to target altitude</td>
                     </tr>
                     <tr>
+                        <td>Fuel Efficiency</td>
+                        <td><span class="score-weight">30%</span></td>
+                        <td>optimal_Δv / actual_Δv (penalizes over and underspending)</td>
+                    </tr>
+                    <tr>
                         <td>Eccentricity Accuracy</td>
-                        <td><span class="score-weight">15%</span></td>
+                        <td><span class="score-weight">20%</span></td>
                         <td>How close to target eccentricity</td>
                     </tr>
                     <tr>
@@ -550,13 +578,8 @@ async def root():
                         <td>How close to target inclination</td>
                     </tr>
                     <tr>
-                        <td>Fuel Efficiency</td>
-                        <td><span class="score-weight">35%</span></td>
-                        <td>optimal_Δv / actual_Δv</td>
-                    </tr>
-                    <tr>
                         <td>Step Efficiency</td>
-                        <td><span class="score-weight">10%</span></td>
+                        <td><span class="score-weight">5%</span></td>
                         <td>Fewer steps = higher score</td>
                     </tr>
                 </tbody>
@@ -579,15 +602,13 @@ async def root():
         }))
         obs = json.<span class="func">loads</span>(<span class="keyword">await</span> ws.<span class="func">recv</span>())
 
-        <span class="comment"># Execute a burn maneuver</span>
+        <span class="comment"># Execute a strategic maneuver</span>
         <span class="keyword">await</span> ws.<span class="func">send</span>(json.<span class="func">dumps</span>({
             <span class="string">"type"</span>: <span class="string">"step"</span>,
             <span class="string">"action"</span>: {
-                <span class="string">"type"</span>: <span class="string">"add_burn"</span>,
-                <span class="string">"delta_v_ms"</span>: 9400,
-                <span class="string">"prograde"</span>: 1.0,
-                <span class="string">"radial"</span>: 0.0,
-                <span class="string">"normal"</span>: 0.0
+                <span class="string">"type"</span>: <span class="string">"execute_maneuver"</span>,
+                <span class="string">"maneuver"</span>: <span class="string">"hohmann_transfer"</span>,
+                <span class="string">"target_altitude_km"</span>: 400
             }
         }))
         result = json.<span class="func">loads</span>(<span class="keyword">await</span> ws.<span class="func">recv</span>())
@@ -598,7 +619,7 @@ async def root():
             <span class="string">"action"</span>: {<span class="string">"type"</span>: <span class="string">"submit_mission"</span>}
         }))
         final = json.<span class="func">loads</span>(<span class="keyword">await</span> ws.<span class="func">recv</span>())
-        <span class="func">print</span>(f<span class="string">"Score: {final['info']['score']}"</span>)
+        <span class="func">print</span>(f<span class="string">"Score: {final['reward']}"</span>)
 
 asyncio.<span class="func">run</span>(<span class="func">run_mission</span>())</div>
 
@@ -615,7 +636,7 @@ asyncio.<span class="func">run</span>(<span class="func">run_mission</span>())</
                     <a href="/docs">API Docs</a>
                 </p>
                 <p style="margin-top: 10px; color: #4a5568; font-size: 0.8em;">
-                    v1.0.0 · Orbit Environment © 2025
+                    v2.0.0 · Orbit Environment © 2025
                 </p>
             </div>
         </div>
@@ -634,10 +655,15 @@ async def get_tasks() -> JSONResponse:
 
 @app.get("/health")
 async def health() -> JSONResponse:
-    """Hugging Face Spaces health check."""
-    return JSONResponse({"status": "healthy"})
+    """Health check for deployment monitoring."""
+    return JSONResponse({
+        "status": "healthy",
+        "environment": "orbit-mission-architect",
+        "version": "2.0.0",
+        "uptime_seconds": round(time.time() - START_TIME, 1),
+        "tasks_available": len(list_tasks()),
+    })
 
-from fastapi import Request
 
 @app.post("/reset")
 async def http_reset(request: Request):
@@ -663,6 +689,7 @@ async def http_reset(request: Request):
         "observation": observation.model_dump(),
         "done": False
     }
+
 
 class StepRequest(BaseModel):
     action: Dict[str, Any]
@@ -691,7 +718,8 @@ async def http_step(req: StepRequest):
 
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
-    
+
+
 @app.post("/close")
 async def http_close():
     global env_instance
@@ -705,6 +733,7 @@ async def http_close():
     env_instance = None
 
     return {"status": "closed"}
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # WebSocket Helpers
@@ -858,8 +887,8 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
     # Send welcome message
     await send_json(websocket, {
-        "type":    "connected",
-        "message": "Welcome to Orbit — AI Space Mission Architect!",
+        "type":    "welcome",
+        "message": "Connected to Orbit — AI Space Mission Architect v2.0",
         "tasks":   list_tasks(),
         "hint":    "Send {\"type\": \"reset\", \"task_id\": \"leo_satellite\"} to start.",
     })
