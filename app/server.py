@@ -96,10 +96,13 @@ async def root():
 
 body {
     font-family: 'Segoe UI', sans-serif;
-    background: #0a0e1a;
-    color: #e0e0e0;
-    overflow-x: hidden;
+    color:#e0e0e0;
+    overflow-x:hidden;
     animation: fadeIn 1s ease-in-out;
+
+    background: radial-gradient(circle at 20% 20%, #1a1f4d, #0a0e1a 40%),
+                radial-gradient(circle at 80% 30%, #2a0845, transparent 40%),
+                radial-gradient(circle at 50% 80%, #003973, transparent 40%);
 }
 
 @keyframes fadeIn {
@@ -107,24 +110,38 @@ body {
     to {opacity:1; transform:translateY(0);}
 }
 
-/* STARFIELD */
-body::before {
-    content:'';
+/* 🌌 Floating gradient blobs */
+body::before, body::after {
+    content:"";
     position:fixed;
-    width:100%; height:100%;
-    background: radial-gradient(white 1px, transparent 1px);
-    background-size: 3px 3px;
-    opacity:0.05;
+    width:400px;
+    height:400px;
+    border-radius:50%;
+    filter: blur(120px);
+    opacity:0.25;
+    z-index:0;
+}
+
+body::before {
+    background:#7b2ff7;
+    top:-100px; left:-100px;
+}
+body::after {
+    background:#00d4ff;
+    bottom:-100px; right:-100px;
 }
 
 /* HEADER */
 .header {
     text-align:center;
-    padding:40px 20px;
+    padding:80px 20px 40px;
+    position:relative;
+    z-index:1;
 }
 
 .header h1 {
-    font-size:3em;
+    font-size:3.5em;
+    letter-spacing:6px;
     background: linear-gradient(90deg,#00d4ff,#7b2ff7,#ff6bcb);
     -webkit-background-clip:text;
     -webkit-text-fill-color:transparent;
@@ -133,41 +150,37 @@ body::before {
 
 @keyframes glow {
     from {text-shadow:0 0 10px #7b2ff7;}
-    to {text-shadow:0 0 25px #00d4ff;}
+    to {text-shadow:0 0 30px #00d4ff;}
 }
 
-/* LAYOUT */
-.container {
+.header p {
+    color:#9aa4c0;
+    margin-top:10px;
+}
+
+/* SECTION */
+.section {
     max-width:1200px;
     margin:auto;
-    padding:20px;
+    padding:60px 20px;
+    position:relative;
+    z-index:1;
 }
 
-/* GLASS CARD */
+/* CARD */
 .card {
-    background: rgba(17,24,39,0.7);
-    backdrop-filter: blur(12px);
-    border:1px solid #1e293b;
-    border-radius:14px;
-    padding:20px;
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(14px);
+    border:1px solid rgba(255,255,255,0.1);
+    border-radius:16px;
+    padding:24px;
     margin-bottom:20px;
     transition:0.3s;
 }
 
 .card:hover {
-    transform:translateY(-4px);
-    box-shadow:0 0 25px rgba(123,47,247,0.25);
-}
-
-/* BUTTON */
-.btn {
-    padding:10px 16px;
-    border:none;
-    border-radius:8px;
-    background: linear-gradient(135deg,#7b2ff7,#00d4ff);
-    color:white;
-    cursor:pointer;
-    font-weight:600;
+    transform:translateY(-6px) scale(1.01);
+    box-shadow:0 0 40px rgba(123,47,247,0.3);
 }
 
 /* GRID */
@@ -175,6 +188,18 @@ body::before {
     display:grid;
     grid-template-columns:1fr 1fr;
     gap:20px;
+}
+
+/* BUTTON */
+.btn {
+    padding:10px 18px;
+    border:none;
+    border-radius:8px;
+    background: linear-gradient(135deg,#7b2ff7,#00d4ff);
+    color:white;
+    font-weight:600;
+    cursor:pointer;
+    margin-top:10px;
 }
 
 /* CANVAS */
@@ -196,13 +221,25 @@ canvas {
     border-radius:10px;
 }
 
-/* INPUT */
-input {
-    padding:8px;
-    width:100%;
-    margin-top:10px;
-    border-radius:6px;
-    border:none;
+/* FEATURE CARDS */
+.features {
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px,1fr));
+    gap:20px;
+}
+
+.feature {
+    padding:20px;
+    border-radius:14px;
+    background: linear-gradient(135deg, rgba(123,47,247,0.2), rgba(0,212,255,0.15));
+    border:1px solid rgba(255,255,255,0.1);
+}
+
+/* FOOTER */
+.footer {
+    text-align:center;
+    padding:60px 20px;
+    color:#6b7280;
 }
 
 /* RESPONSIVE */
@@ -219,9 +256,19 @@ input {
     <p>AI Space Mission Architect</p>
 </div>
 
-<div class="container">
+<!-- 🌌 HERO / DESCRIPTION -->
+<div class="section">
+<div class="card">
+    <h2>🚀 What is Orbit?</h2>
+    <p>
+    Orbit is a next-generation RL environment where AI agents design space missions
+    using real orbital mechanics — optimizing fuel, trajectory, and mission success.
+    </p>
+</div>
+</div>
 
-<!-- 🚀 SIMULATOR PANEL -->
+<!-- 🛰️ SIMULATOR -->
+<div class="section">
 <div class="grid">
 
 <div class="card">
@@ -237,26 +284,59 @@ input {
 <button class="btn" onclick="resetMission()">Reset</button>
 <button class="btn" onclick="stepMission()">Step</button>
 
-<input id="taskInput" placeholder="task_id (e.g. leo_satellite)">
+<input id="taskInput" placeholder="task_id (leo_satellite)">
 </div>
 
 </div>
+</div>
 
-<!-- MISSIONS -->
+<!-- ✨ FEATURES -->
+<div class="section">
+<h2>✨ Features</h2>
+<div class="features">
+    <div class="feature">⚡ Real-time mission simulation</div>
+    <div class="feature">🧠 RL-ready environment</div>
+    <div class="feature">🛰️ Orbital maneuver planning</div>
+    <div class="feature">📊 Deterministic scoring</div>
+</div>
+</div>
+
+<!-- 🚀 MISSIONS -->
+<div class="section">
+<h2>🚀 Missions</h2>
+<div class="card">LEO Satellite Deployment</div>
+<div class="card">Lunar Orbit Insertion</div>
+<div class="card">Asteroid Bennu Rendezvous</div>
+</div>
+
+<!-- 📊 EXTRA SPACE (FOR SCROLL DEPTH) -->
+<div class="section">
 <div class="card">
-<h3>🚀 Missions</h3>
-<p>LEO · Lunar · Bennu Asteroid</p>
+<h2>📡 Why It Matters</h2>
+<p>
+This project bridges AI and aerospace engineering — enabling intelligent
+decision-making in mission-critical environments.
+</p>
 </div>
 
+<div class="card">
+<h2>🌍 Future Scope</h2>
+<p>
+Multi-agent planning, real-time trajectory visualization, and integration with
+space datasets.
+</p>
+</div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+    Built for Hackathon · Orbit v2.0
 </div>
 
 <script>
-/* ===========================
-   ORBIT ANIMATION (NASA STYLE)
-=========================== */
+/* ORBIT ANIMATION */
 const canvas = document.getElementById('orbitCanvas');
 const ctx = canvas.getContext('2d');
-
 canvas.width = canvas.offsetWidth;
 canvas.height = canvas.offsetHeight;
 
@@ -264,23 +344,19 @@ let angle = 0;
 
 function drawOrbit(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
-
     let cx = canvas.width/2;
     let cy = canvas.height/2;
 
-    // planet
     ctx.beginPath();
     ctx.arc(cx,cy,20,0,Math.PI*2);
     ctx.fillStyle="#00d4ff";
     ctx.fill();
 
-    // orbit path
     ctx.beginPath();
     ctx.arc(cx,cy,100,0,Math.PI*2);
-    ctx.strokeStyle="#444";
+    ctx.strokeStyle="#555";
     ctx.stroke();
 
-    // satellite
     let x = cx + 100*Math.cos(angle);
     let y = cy + 100*Math.sin(angle);
 
@@ -294,11 +370,8 @@ function drawOrbit(){
 }
 drawOrbit();
 
-/* ===========================
-   WEBSOCKET CLIENT
-=========================== */
+/* WEBSOCKET */
 let ws;
-
 function log(msg){
     let c = document.getElementById("console");
     c.innerHTML += msg + "<br>";
@@ -307,10 +380,8 @@ function log(msg){
 
 function connectWS(){
     ws = new WebSocket("wss://" + location.host + "/ws");
-
     ws.onopen = () => log("✅ Connected");
     ws.onmessage = (e) => log("📩 " + e.data);
-    ws.onerror = () => log("❌ Error");
 }
 
 function resetMission(){
@@ -328,25 +399,6 @@ function stepMission(){
         }
     }));
 }
-
-/* ===========================
-   SCROLL ANIMATIONS
-=========================== */
-const observer = new IntersectionObserver(entries=>{
-    entries.forEach(e=>{
-        if(e.isIntersecting){
-            e.target.style.opacity=1;
-            e.target.style.transform="translateY(0)";
-        }
-    });
-});
-
-document.querySelectorAll('.card').forEach(el=>{
-    el.style.opacity=0;
-    el.style.transform="translateY(20px)";
-    el.style.transition="0.6s";
-    observer.observe(el);
-});
 </script>
 
 </body>
