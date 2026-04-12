@@ -116,17 +116,42 @@ body::before, body::after {
 body::before { background:#7b2ff7; top:-100px; left:-100px; }
 body::after { background:#00d4ff; bottom:-100px; right:-100px; }
 
+/* ROCKET */
+.rocket {
+    position:fixed;
+    top:50%;
+    left:-200px;
+    transform:translateY(-50%);
+    font-size:40px;
+    z-index:9999;
+    animation: flyRocket 1.2s ease-out forwards;
+}
+
 /* HEADER */
 .header {
     text-align:center;
     padding:80px 20px 40px;
 }
+
 .header h1 {
-    font-size:3.5em;
-    letter-spacing:6px;
-    background: linear-gradient(90deg,#00d4ff,#7b2ff7,#ff6bcb);
+    font-size:3.8em;
+    letter-spacing:8px;
+    position:relative;
+    opacity:0;
+    transform:translateY(40px);
+
+    background: linear-gradient(90deg,#00d4ff,#7b2ff7,#ff6bcb,#00d4ff);
+    background-size:300%;
     -webkit-background-clip:text;
     -webkit-text-fill-color:transparent;
+
+    text-shadow:
+        0 0 10px rgba(0,212,255,0.8),
+        0 0 20px rgba(123,47,247,0.6),
+        0 0 40px rgba(255,107,203,0.4);
+
+    animation: gradientFlow 6s infinite, fadeInOrbit 1.2s ease forwards;
+    animation-delay: 0s, 1.2s;
 }
 
 /* SECTION */
@@ -200,7 +225,7 @@ canvas {
     background: linear-gradient(135deg, rgba(123,47,247,0.2), rgba(0,212,255,0.15));
 }
 
-/* ACCORDION (NEW ADDITION) */
+/* ACCORDION */
 .accordion {
     cursor:pointer;
 }
@@ -224,6 +249,31 @@ canvas {
     color:#6b7280;
 }
 
+/* ANIMATIONS */
+@keyframes gradientFlow {
+    0% { background-position:0% }
+    50% { background-position:100% }
+    100% { background-position:0% }
+}
+
+@keyframes fadeInOrbit {
+    to {
+        opacity:1;
+        transform:translateY(0);
+    }
+}
+
+@keyframes flyRocket {
+    0% {
+        left:-200px;
+        transform:translateY(-50%) rotate(10deg);
+    }
+    100% {
+        left:110%;
+        transform:translateY(-50%) rotate(0deg);
+    }
+}
+
 /* RESPONSIVE */
 @media(max-width:800px){
     .grid { grid-template-columns:1fr; }
@@ -233,12 +283,13 @@ canvas {
 
 <body>
 
+<div class="rocket">🚀</div>
+
 <div class="header">
     <h1>ORBIT</h1>
     <p>AI Space Mission Architect</p>
 </div>
 
-<!-- HERO -->
 <div class="section">
 <div class="card">
     <h2>🚀 What is Orbit?</h2>
@@ -249,7 +300,6 @@ canvas {
 </div>
 </div>
 
-<!-- SIMULATOR -->
 <div class="section">
 <div class="grid">
 
@@ -272,7 +322,6 @@ canvas {
 </div>
 </div>
 
-<!-- FEATURES -->
 <div class="section">
 <h2>✨ Features</h2>
 <div class="features">
@@ -283,7 +332,6 @@ canvas {
 </div>
 </div>
 
-<!-- MISSIONS (UPDATED ONLY THIS PART) -->
 <div class="section">
 <h2>🚀 Missions</h2>
 
@@ -304,7 +352,6 @@ Deep-space mission using gravity assists and multi-step trajectory optimization.
 
 </div>
 
-<!-- EXTRA CONTENT (UNCHANGED / PRESERVED) -->
 <div class="section">
 <div class="card">
 <h2>📡 Why It Matters</h2>
@@ -328,6 +375,14 @@ space datasets.
 </div>
 
 <script>
+/* ROCKET CONTROL */
+window.addEventListener("load", () => {
+    const rocket = document.querySelector(".rocket");
+    setTimeout(() => {
+        rocket.style.display = "none";
+    }, 1200);
+});
+
 /* ACCORDION */
 document.querySelectorAll(".accordion").forEach((btn,i)=>{
     btn.addEventListener("click",()=>{
@@ -336,7 +391,7 @@ document.querySelectorAll(".accordion").forEach((btn,i)=>{
     });
 });
 
-/* ORBIT SIMULATION (UPGRADED ONLY) */
+/* ORBIT SIMULATION */
 const canvas = document.getElementById('orbitCanvas');
 const ctx = canvas.getContext('2d');
 canvas.width = canvas.offsetWidth;
@@ -351,13 +406,11 @@ function drawOrbit(){
     let cx = canvas.width/2;
     let cy = canvas.height/2;
 
-    // stars
     for(let i=0;i<30;i++){
         ctx.fillStyle="white";
         ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height,1,1);
     }
 
-    // glowing planet
     let grd = ctx.createRadialGradient(cx,cy,10,cx,cy,40);
     grd.addColorStop(0,"#00d4ff");
     grd.addColorStop(1,"transparent");
@@ -366,7 +419,6 @@ function drawOrbit(){
     ctx.arc(cx,cy,40,0,Math.PI*2);
     ctx.fill();
 
-    // orbit rings
     ctx.strokeStyle="#444";
     ctx.beginPath();
     ctx.arc(cx,cy,100,0,Math.PI*2);
@@ -376,7 +428,6 @@ function drawOrbit(){
     ctx.arc(cx,cy,150,0,Math.PI*2);
     ctx.stroke();
 
-    // satellites
     let x1 = cx + 100*Math.cos(angle);
     let y1 = cy + 100*Math.sin(angle);
 
@@ -397,7 +448,7 @@ function drawOrbit(){
 }
 drawOrbit();
 
-/* WEBSOCKET (UNCHANGED) */
+/* WEBSOCKET */
 let ws;
 function log(msg){
     let c = document.getElementById("console");
