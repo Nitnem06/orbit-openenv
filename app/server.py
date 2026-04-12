@@ -311,11 +311,40 @@ body::after{
 }
 
 .telemetry-card {
-    transition: transform .25s ease, border-color .25s ease;
+    transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
 }
 .telemetry-card:hover {
     transform: translateY(-2px);
     border-color: rgba(148,163,184,.22);
+}
+
+.metric-value {
+    transition: color .25s ease, transform .25s ease;
+}
+.metric-flash {
+    color:#67e8f9 !important;
+    transform: scale(1.03);
+}
+
+.console-resize-handle {
+    height: 12px;
+    cursor: ns-resize;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-bottom:12px;
+}
+.console-resize-handle::before {
+    content:"";
+    width:56px;
+    height:4px;
+    border-radius:999px;
+    background: rgba(148,163,184,.35);
+    box-shadow: 0 0 12px rgba(148,163,184,.15);
+}
+
+@media (max-width: 1280px) {
+    .console-stickiness { position: static !important; }
 }
 </style>
 </head>
@@ -420,8 +449,7 @@ body::after{
                 </div>
             </section>
 
-            <!-- MOVED CONTROLS HIGHER -->
-            <section class="panel rounded-2xl p-4 reveal glow-cyan xl:sticky xl:top-4">
+            <section class="panel rounded-2xl p-4 reveal glow-cyan xl:sticky xl:top-4 console-stickiness">
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="text-sm font-semibold tracking-[0.16em] text-slate-200">CONTROL ACTIONS</h2>
                     <span class="text-xs text-slate-500 mono">safe mode</span>
@@ -484,35 +512,68 @@ body::after{
                 <div class="flex items-center justify-between mb-3">
                     <div>
                         <h2 class="text-sm font-semibold tracking-[0.16em] text-slate-200">ORBIT VISUALIZATION</h2>
-                        <p class="text-xs text-slate-500 mt-1">Live visual layer for the current environment session</p>
+                        <p class="text-xs text-slate-500 mt-1">Live visual layer driven by current environment telemetry</p>
                     </div>
-                    <div class="text-xs text-slate-500 mono">mission-control view</div>
+                    <div class="text-xs text-slate-500 mono" id="orbitVizLabel">mission-control view</div>
                 </div>
                 <div class="rounded-2xl overflow-hidden border border-slate-800 bg-black/35 h-[340px] md:h-[420px] xl:h-[460px]">
                     <canvas id="orbitCanvas" class="w-full h-full"></canvas>
                 </div>
             </section>
 
+            <!-- REAL TELEMETRY -->
             <section class="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4 gap-4 reveal">
                 <div class="telemetry-card panel rounded-2xl p-4">
-                    <div class="text-xs tracking-[0.16em] text-slate-500">CURRENT TASK</div>
-                    <div id="metricTask" class="mt-2 text-lg font-semibold">leo_satellite</div>
-                    <div class="text-xs text-slate-500 mt-1">Active selected mission</div>
+                    <div class="text-xs tracking-[0.16em] text-slate-500">CURRENT ALTITUDE</div>
+                    <div id="currentAltitudeCard" class="metric-value mt-2 text-lg font-semibold mono">— km</div>
+                    <div class="text-xs text-slate-500 mt-1">observation.current_orbit.altitude_km</div>
                 </div>
                 <div class="telemetry-card panel rounded-2xl p-4">
+                    <div class="text-xs tracking-[0.16em] text-slate-500">TARGET ALTITUDE</div>
+                    <div id="targetAltitudeCard" class="metric-value mt-2 text-lg font-semibold mono">— km</div>
+                    <div class="text-xs text-slate-500 mt-1">observation.target_orbit.altitude_km</div>
+                </div>
+                <div class="telemetry-card panel rounded-2xl p-4">
+                    <div class="text-xs tracking-[0.16em] text-slate-500">Δ-v USED / BUDGET</div>
+                    <div id="deltaVCard" class="metric-value mt-2 text-lg font-semibold mono">— / —</div>
+                    <div class="text-xs text-slate-500 mt-1">observation.delta_v_used / delta_v_budget</div>
+                </div>
+                <div class="telemetry-card panel rounded-2xl p-4">
+                    <div class="text-xs tracking-[0.16em] text-slate-500">STEP INDEX</div>
+                    <div id="stepCard" class="metric-value mt-2 text-lg font-semibold mono">— / —</div>
+                    <div class="text-xs text-slate-500 mt-1">observation.step_index / max_steps</div>
+                </div>
+            </section>
+
+            <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 reveal">
+                <div class="panel rounded-2xl p-4">
+                    <div class="text-xs tracking-[0.16em] text-slate-500">CURRENT ORBIT</div>
+                    <div class="mt-3 space-y-2 text-sm">
+                        <div class="flex justify-between"><span class="text-slate-500">Altitude</span><span id="curAlt" class="mono metric-value">—</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Inclination</span><span id="curInc" class="mono metric-value">—</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Eccentricity</span><span id="curEcc" class="mono metric-value">—</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Velocity</span><span id="curVel" class="mono metric-value">—</span></div>
+                    </div>
+                </div>
+
+                <div class="panel rounded-2xl p-4">
+                    <div class="text-xs tracking-[0.16em] text-slate-500">TARGET ORBIT</div>
+                    <div class="mt-3 space-y-2 text-sm">
+                        <div class="flex justify-between"><span class="text-slate-500">Altitude</span><span id="tgtAlt" class="mono metric-value">—</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Inclination</span><span id="tgtInc" class="mono metric-value">—</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Eccentricity</span><span id="tgtEcc" class="mono metric-value">—</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Last Action</span><span id="lastActionResultInline" class="mono metric-value">—</span></div>
+                    </div>
+                </div>
+
+                <div class="panel rounded-2xl p-4">
                     <div class="text-xs tracking-[0.16em] text-slate-500">SESSION STATUS</div>
-                    <div id="metricStatus" class="mt-2 text-lg font-semibold">Awaiting Connection</div>
-                    <div class="text-xs text-slate-500 mt-1">WebSocket-driven interaction state</div>
-                </div>
-                <div class="telemetry-card panel rounded-2xl p-4">
-                    <div class="text-xs tracking-[0.16em] text-slate-500">LAST ACTION</div>
-                    <div id="metricAction" class="mt-2 text-lg font-semibold">None</div>
-                    <div class="text-xs text-slate-500 mt-1">Latest control operation sent</div>
-                </div>
-                <div class="telemetry-card panel rounded-2xl p-4">
-                    <div class="text-xs tracking-[0.16em] text-slate-500">MESSAGE FLOW</div>
-                    <div id="metricMessages" class="mt-2 text-lg font-semibold mono">0</div>
-                    <div class="text-xs text-slate-500 mt-1">Incoming WebSocket frames</div>
+                    <div class="mt-3 space-y-2 text-sm">
+                        <div class="flex justify-between"><span class="text-slate-500">Current Task</span><span id="metricTask" class="mono metric-value">leo_satellite</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Status</span><span id="metricStatus" class="metric-value">Awaiting Connection</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Last Action Type</span><span id="metricAction" class="mono metric-value">None</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Message Flow</span><span id="metricMessages" class="mono metric-value">0</span></div>
+                    </div>
                 </div>
             </section>
         </div>
@@ -544,7 +605,7 @@ body::after{
             <section class="panel rounded-2xl p-4 reveal">
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="text-sm font-semibold tracking-[0.16em] text-slate-200">LIVE METRICS</h2>
-                    <span class="text-xs text-slate-500 mono">safe placeholders</span>
+                    <span class="text-xs text-slate-500 mono">real-time</span>
                 </div>
 
                 <div class="space-y-3">
@@ -572,6 +633,18 @@ body::after{
                             <span id="donePill" class="text-xs mono text-slate-300">false</span>
                         </div>
                     </div>
+                    <div class="panel-soft rounded-xl p-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-slate-500">Last Message Type</span>
+                            <span id="lastMessageTypePill" class="text-xs mono text-cyan-300">—</span>
+                        </div>
+                    </div>
+                    <div class="panel-soft rounded-xl p-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-slate-500">Fuel Remaining</span>
+                            <span id="fuelRemainingPill" class="text-xs mono text-slate-300">—</span>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -587,17 +660,19 @@ body::after{
         </div>
     </div>
 
-    <!-- CONSOLE -->
-    <section class="panel rounded-2xl p-4 reveal mt-4">
+    <!-- RESIZABLE CONSOLE -->
+    <section class="panel rounded-2xl p-4 reveal mt-4" id="consolePanel">
+        <div class="console-resize-handle" id="consoleResizeHandle" title="Drag to resize telemetry console"></div>
+
         <div class="flex items-center justify-between mb-3">
             <div>
                 <h2 class="text-sm font-semibold tracking-[0.16em] text-slate-200">TELEMETRY CONSOLE</h2>
-                <p class="text-xs text-slate-500 mt-1">Raw WebSocket event stream and protocol traffic</p>
+                <p class="text-xs text-slate-500 mt-1">Structured WebSocket feed with raw protocol traffic and transition logs</p>
             </div>
             <button onclick="clearConsole()" class="px-3 py-2 rounded-xl btn-dark text-xs transition">Clear Console</button>
         </div>
 
-        <div id="console" class="h-[220px] overflow-auto scrollbar-thin rounded-2xl bg-black/40 border border-slate-800 p-4 mono text-[13px] leading-6 text-slate-300"></div>
+        <div id="console" class="overflow-auto scrollbar-thin rounded-2xl bg-black/40 border border-slate-800 p-4 mono text-[13px] leading-6 text-slate-300" style="height:260px;"></div>
     </section>
 </div>
 
@@ -681,6 +756,19 @@ let ws = null;
 let angle = 0;
 let messageCount = 0;
 
+let envTelemetry = {
+    current_orbit: null,
+    target_orbit: null,
+    delta_v_used: null,
+    delta_v_budget: null,
+    step_index: null,
+    max_steps: null,
+    last_action_result: null,
+    reward: null,
+    done: false,
+    last_message_type: null
+};
+
 /* -------------------------------------------------------------------------- */
 /* HELPERS */
 /* -------------------------------------------------------------------------- */
@@ -695,19 +783,19 @@ function setConnection(state) {
         text.textContent = "Connecting";
         pill.textContent = "connecting";
         pill.className = "text-xs mono text-amber-300";
-        document.getElementById("metricStatus").textContent = "Connecting";
+        setText("metricStatus", "Connecting");
     } else if (state === "connected") {
         dot.classList.add("dot-green");
         text.textContent = "Connected";
         pill.textContent = "connected";
         pill.className = "text-xs mono text-emerald-300";
-        document.getElementById("metricStatus").textContent = "Connected";
+        setText("metricStatus", "Connected");
     } else {
         dot.classList.add("dot-red");
         text.textContent = "Disconnected";
         pill.textContent = "disconnected";
         pill.className = "text-xs mono text-rose-300";
-        document.getElementById("metricStatus").textContent = "Awaiting Connection";
+        setText("metricStatus", "Awaiting Connection");
     }
 }
 
@@ -716,18 +804,54 @@ function setEpisodeState(state) {
     document.getElementById("episodeStatePill").textContent = state.toLowerCase();
 }
 
+function setText(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = value;
+}
+
+function flashMetric(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add("metric-flash");
+    setTimeout(() => el.classList.remove("metric-flash"), 280);
+}
+
+function safeNum(v) {
+    return typeof v === "number" && !isNaN(v);
+}
+
+function fmt(v, suffix="") {
+    if (v === null || v === undefined || v === "") return "—";
+    if (typeof v === "number") {
+        const abs = Math.abs(v);
+        const d = abs >= 100 ? 0 : abs >= 10 ? 2 : 3;
+        return v.toFixed(d) + suffix;
+    }
+    return String(v) + suffix;
+}
+
+function fmtCompact(v, suffix="") {
+    if (v === null || v === undefined || v === "") return "—";
+    if (typeof v === "number") return Math.round(v) + suffix;
+    return String(v) + suffix;
+}
+
 function log(msg, type="default") {
     const consoleEl = document.getElementById("console");
     const time = new Date().toLocaleTimeString();
     let color = "text-slate-300";
-    if (type === "success") color = "text-emerald-300";
-    if (type === "error") color = "text-rose-300";
-    if (type === "warn") color = "text-amber-300";
-    if (type === "info") color = "text-cyan-300";
+    let prefix = "LOG";
+
+    if (type === "success") { color = "text-emerald-300"; prefix = "OK"; }
+    if (type === "error")   { color = "text-rose-300"; prefix = "ERR"; }
+    if (type === "warn")    { color = "text-amber-300"; prefix = "ACT"; }
+    if (type === "info")    { color = "text-cyan-300"; prefix = "RX"; }
+    if (type === "tx")      { color = "text-violet-300"; prefix = "TX"; }
 
     const line = document.createElement("div");
     line.className = "console-line " + color;
-    line.innerHTML = `<span class="text-slate-500">[${time}]</span> ${escapeHtml(msg)}`;
+    line.innerHTML = `<span class="text-slate-500">[${time}]</span> <span class="text-slate-500">${prefix}</span> ${escapeHtml(msg)}`;
     consoleEl.appendChild(line);
     consoleEl.scrollTop = consoleEl.scrollHeight;
 }
@@ -759,10 +883,11 @@ function ensureSocket() {
 /* -------------------------------------------------------------------------- */
 function selectTask(taskId, el) {
     selectedTask = taskId;
+    setText("taskInput", taskId);
     document.getElementById("taskInput").value = taskId;
-    document.getElementById("activeTaskText").textContent = taskId;
-    document.getElementById("metricTask").textContent = taskId;
-    document.getElementById("taskBadge").textContent = taskId;
+    setText("activeTaskText", taskId);
+    setText("metricTask", taskId);
+    setText("taskBadge", taskId);
 
     document.querySelectorAll(".mission-tile").forEach(card => {
         card.classList.remove("active");
@@ -777,14 +902,86 @@ function selectTask(taskId, el) {
 
     const meta = missionMeta[taskId];
     if (meta) {
-        document.getElementById("briefTitle").textContent = meta.title;
-        document.getElementById("briefSummary").textContent = meta.summary;
-        document.getElementById("briefReference").textContent = meta.reference;
-        document.getElementById("briefPlan").textContent = meta.plan;
-        document.getElementById("notesBox").textContent = meta.notes;
+        setText("briefTitle", meta.title);
+        setText("briefSummary", meta.summary);
+        setText("briefReference", meta.reference);
+        setText("briefPlan", meta.plan);
+        setText("notesBox", meta.notes);
     }
 
+    // change visual label
+    if (taskId === "lunar_orbit") setText("orbitVizLabel", "earth-moon transfer view");
+    else if (taskId === "asteroid_rendezvous") setText("orbitVizLabel", "deep-space transfer view");
+    else setText("orbitVizLabel", "earth-orbit mission view");
+
     log("Task selected: " + taskId, "info");
+}
+
+/* -------------------------------------------------------------------------- */
+/* TELEMETRY BINDING */
+/* -------------------------------------------------------------------------- */
+function applyTelemetry(obs, reward=null, done=null, msgType=null) {
+    if (!obs || typeof obs !== "object") return;
+
+    envTelemetry.current_orbit = obs.current_orbit || envTelemetry.current_orbit;
+    envTelemetry.target_orbit = obs.target_orbit || envTelemetry.target_orbit;
+    envTelemetry.delta_v_used = obs.delta_v_used ?? envTelemetry.delta_v_used;
+    envTelemetry.delta_v_budget = obs.delta_v_budget ?? envTelemetry.delta_v_budget;
+    envTelemetry.step_index = obs.step_index ?? envTelemetry.step_index;
+    envTelemetry.max_steps = obs.max_steps ?? envTelemetry.max_steps;
+    envTelemetry.last_action_result = obs.last_action_result ?? envTelemetry.last_action_result;
+    if (reward !== null && reward !== undefined) envTelemetry.reward = reward;
+    if (done !== null && done !== undefined) envTelemetry.done = done;
+    if (msgType) envTelemetry.last_message_type = msgType;
+
+    const co = envTelemetry.current_orbit || {};
+    const to = envTelemetry.target_orbit || {};
+
+    // top telemetry cards
+    setAndFlash("currentAltitudeCard", fmtCompact(co.altitude_km, " km"));
+    setAndFlash("targetAltitudeCard", fmtCompact(to.altitude_km, " km"));
+
+    if (envTelemetry.delta_v_used !== null || envTelemetry.delta_v_budget !== null) {
+        setAndFlash("deltaVCard", `${fmtCompact(envTelemetry.delta_v_used)} / ${fmtCompact(envTelemetry.delta_v_budget)} m/s`);
+    }
+
+    if (envTelemetry.step_index !== null || envTelemetry.max_steps !== null) {
+        setAndFlash("stepCard", `${envTelemetry.step_index ?? "—"} / ${envTelemetry.max_steps ?? "—"}`);
+    }
+
+    // current orbit block
+    setAndFlash("curAlt", fmt(co.altitude_km, " km"));
+    setAndFlash("curInc", fmt(co.inclination_deg, "°"));
+    setAndFlash("curEcc", fmt(co.eccentricity));
+    setAndFlash("curVel", fmt(co.velocity_kms ?? co.velocity_km_s ?? co.velocity_ms, co.velocity_ms != null ? " m/s" : " km/s"));
+
+    // target orbit block
+    setAndFlash("tgtAlt", fmt(to.altitude_km, " km"));
+    setAndFlash("tgtInc", fmt(to.inclination_deg, "°"));
+    setAndFlash("tgtEcc", fmt(to.eccentricity));
+    setAndFlash("lastActionResultInline", envTelemetry.last_action_result || "—");
+
+    // right metrics
+    setText("rewardPill", envTelemetry.reward !== null && envTelemetry.reward !== undefined ? String(envTelemetry.reward) : "—");
+    setText("donePill", String(!!envTelemetry.done));
+    setText("lastMessageTypePill", envTelemetry.last_message_type || "—");
+
+    if (envTelemetry.delta_v_used !== null && envTelemetry.delta_v_budget !== null) {
+        const remaining = envTelemetry.delta_v_budget - envTelemetry.delta_v_used;
+        setText("fuelRemainingPill", fmtCompact(remaining, " m/s"));
+    }
+
+    // status messaging
+    if (envTelemetry.done === true) {
+        setEpisodeState("Done");
+    }
+
+    drawOrbit();
+}
+
+function setAndFlash(id, value) {
+    setText(id, value);
+    flashMetric(id);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -797,7 +994,7 @@ function connectWS() {
     }
 
     setConnection("connecting");
-    log("Opening WebSocket connection...", "info");
+    log("Opening WebSocket connection...", "tx");
 
     const protocol = location.protocol === "https:" ? "wss://" : "ws://";
     ws = new WebSocket(protocol + location.host + "/ws");
@@ -822,49 +1019,50 @@ function connectWS() {
 
     ws.onmessage = (e) => {
         messageCount += 1;
-        document.getElementById("metricMessages").textContent = String(messageCount);
+        setAndFlash("metricMessages", String(messageCount));
 
         log("Received: " + e.data, "info");
 
         try {
             const msg = JSON.parse(e.data);
+            envTelemetry.last_message_type = msg.type || "unknown";
+            setText("lastMessageTypePill", envTelemetry.last_message_type);
 
             if (msg.type === "welcome") {
                 setEpisodeState("Ready");
-                document.getElementById("metricAction").textContent = "welcome";
+                setAndFlash("metricAction", "welcome");
                 return;
             }
 
             if (msg.type === "observation") {
                 setEpisodeState("Active");
-                document.getElementById("metricAction").textContent = "reset";
-                document.getElementById("rewardPill").textContent = "—";
-                document.getElementById("donePill").textContent = "false";
+                setAndFlash("metricAction", "reset");
+                envTelemetry.reward = null;
+                envTelemetry.done = false;
+                applyTelemetry(msg.data || {}, null, false, "observation");
                 return;
             }
 
             if (msg.type === "step_result") {
                 setEpisodeState(msg.done ? "Done" : "Active");
-                document.getElementById("metricAction").textContent = "step";
-                document.getElementById("rewardPill").textContent =
-                    msg.reward !== undefined ? String(msg.reward) : "—";
-                document.getElementById("donePill").textContent =
-                    msg.done !== undefined ? String(msg.done) : "false";
+                setAndFlash("metricAction", "step_result");
+                applyTelemetry(msg.observation || {}, msg.reward, msg.done, "step_result");
                 return;
             }
 
             if (msg.type === "state") {
-                document.getElementById("metricAction").textContent = "state";
+                setAndFlash("metricAction", "state");
+                applyTelemetry(msg.data || {}, null, null, "state");
                 return;
             }
 
             if (msg.type === "task_list") {
-                document.getElementById("metricAction").textContent = "list_tasks";
+                setAndFlash("metricAction", "task_list");
                 return;
             }
 
             if (msg.type === "error") {
-                document.getElementById("metricAction").textContent = "error";
+                setAndFlash("metricAction", "error");
                 log(msg.message || "Server returned error.", "error");
                 return;
             }
@@ -879,13 +1077,13 @@ function resetMission() {
 
     const task = document.getElementById("taskInput").value || selectedTask || "leo_satellite";
     selectedTask = task;
-    document.getElementById("activeTaskText").textContent = task;
-    document.getElementById("metricTask").textContent = task;
+    setText("activeTaskText", task);
+    setText("metricTask", task);
 
     ws.send(JSON.stringify({ type: "reset", task_id: task }));
-    document.getElementById("metricAction").textContent = "reset";
+    setAndFlash("metricAction", "reset");
     setEpisodeState("Resetting");
-    log("Sent reset for task_id=" + task, "success");
+    log("Sent reset for task_id=" + task, "tx");
 }
 
 function stepMission() {
@@ -900,9 +1098,37 @@ function stepMission() {
         }
     }));
 
-    document.getElementById("metricAction").textContent = "execute_maneuver";
-    log("Sent step action: execute_maneuver / hohmann_transfer / target_altitude_km=400", "warn");
+    setAndFlash("metricAction", "execute_maneuver");
+    log("Sent step action: execute_maneuver / hohmann_transfer / target_altitude_km=400", "tx");
 }
+
+/* -------------------------------------------------------------------------- */
+/* RESIZABLE CONSOLE */
+/* -------------------------------------------------------------------------- */
+const consoleEl = document.getElementById("console");
+const consoleResizeHandle = document.getElementById("consoleResizeHandle");
+let isResizingConsole = false;
+let startY = 0;
+let startHeight = 260;
+
+consoleResizeHandle.addEventListener("mousedown", (e) => {
+    isResizingConsole = true;
+    startY = e.clientY;
+    startHeight = consoleEl.offsetHeight;
+    document.body.style.userSelect = "none";
+});
+
+window.addEventListener("mousemove", (e) => {
+    if (!isResizingConsole) return;
+    const delta = e.clientY - startY;
+    const newHeight = Math.min(520, Math.max(180, startHeight + delta));
+    consoleEl.style.height = newHeight + "px";
+});
+
+window.addEventListener("mouseup", () => {
+    isResizingConsole = false;
+    document.body.style.userSelect = "";
+});
 
 /* -------------------------------------------------------------------------- */
 /* CANVAS VISUALIZER */
@@ -930,6 +1156,12 @@ function initStars() {
         r: Math.random() * 1.5 + 0.3,
         a: Math.random() * 0.6 + 0.15
     }));
+}
+
+function altitudeToRadius(alt, minR=90, maxR=180) {
+    if (!safeNum(alt)) return minR;
+    const normalized = Math.min(1, Math.max(0, alt / 1000));
+    return minR + normalized * (maxR - minR);
 }
 
 function drawOrbit() {
@@ -993,22 +1225,33 @@ function drawOrbit() {
     ctx.arc(cx, cy, 24, 0, Math.PI * 2);
     ctx.fill();
 
+    const curAlt = envTelemetry.current_orbit && safeNum(envTelemetry.current_orbit.altitude_km)
+        ? envTelemetry.current_orbit.altitude_km
+        : 400;
+
+    const tgtAlt = envTelemetry.target_orbit && safeNum(envTelemetry.target_orbit.altitude_km)
+        ? envTelemetry.target_orbit.altitude_km
+        : 600;
+
+    const curRadius = altitudeToRadius(curAlt, 95, 165);
+    const tgtRadius = altitudeToRadius(tgtAlt, 110, 205);
+
     ctx.setLineDash([8, 8]);
     ctx.strokeStyle = "rgba(168,85,247,0.75)";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(cx, cy, 150, 0, Math.PI * 2);
+    ctx.arc(cx, cy, tgtRadius, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
 
     ctx.strokeStyle = "rgba(34,211,238,0.85)";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(cx, cy, 105, 0, Math.PI * 2);
+    ctx.arc(cx, cy, curRadius, 0, Math.PI * 2);
     ctx.stroke();
 
-    const sx = cx + Math.cos(angle) * 105;
-    const sy = cy + Math.sin(angle) * 105;
+    const sx = cx + Math.cos(angle) * curRadius;
+    const sy = cy + Math.sin(angle) * curRadius;
 
     ctx.shadowBlur = 18;
     ctx.shadowColor = "rgba(255,255,255,.8)";
@@ -1020,9 +1263,16 @@ function drawOrbit() {
 
     ctx.fillStyle = "rgba(226,232,240,0.75)";
     ctx.font = "12px ui-monospace, monospace";
-    ctx.fillText("current orbit", cx + 112, cy + 10);
-    ctx.fillText("target orbit", cx + 158, cy - 8);
+    ctx.fillText("current orbit", cx + curRadius + 8, cy + 10);
+    ctx.fillText("target orbit", cx + tgtRadius + 8, cy - 8);
     ctx.fillText("Earth", cx - 14, cy + 42);
+
+    if (envTelemetry.current_orbit && safeNum(envTelemetry.current_orbit.altitude_km)) {
+        ctx.fillText(`alt ${Math.round(curAlt)} km`, cx - 40, cy - curRadius - 10);
+    }
+    if (envTelemetry.target_orbit && safeNum(envTelemetry.target_orbit.altitude_km)) {
+        ctx.fillText(`target ${Math.round(tgtAlt)} km`, cx - 46, cy - tgtRadius - 10);
+    }
 
     angle += 0.008;
     requestAnimationFrame(drawOrbit);
@@ -1035,6 +1285,7 @@ drawOrbit();
 /* -------------------------------------------------------------------------- */
 /* INIT */
 /* -------------------------------------------------------------------------- */
+selectTask("leo_satellite", document.querySelector('[data-task="leo_satellite"]'));
 setConnection("disconnected");
 setEpisodeState("Idle");
 log("Interface initialized. Complete boot sequence, then connect to the environment.", "info");
