@@ -100,21 +100,21 @@ body {
     overflow-x:hidden;
 
     background:
-        radial-gradient(circle at 20% 20%, rgba(0,212,255,0.25), transparent 40%),
-        radial-gradient(circle at 80% 30%, rgba(123,47,247,0.25), transparent 40%),
-        radial-gradient(circle at 50% 80%, rgba(255,107,203,0.2), transparent 40%),
-        #0a0e1a;
+        radial-gradient(circle at 20% 20%, rgba(0,212,255,0.35), transparent 45%),
+        radial-gradient(circle at 80% 30%, rgba(123,47,247,0.35), transparent 45%),
+        radial-gradient(circle at 50% 80%, rgba(255,107,203,0.25), transparent 45%),
+        #070a14;
 }
 
-/* subtle stars */
+/* stronger stars */
 body::after {
     content:"";
     position:fixed;
     width:100%;
     height:100%;
     background-image: radial-gradient(white 1px, transparent 1px);
-    background-size: 80px 80px;
-    opacity:0.08;
+    background-size: 60px 60px;
+    opacity:0.12;
     pointer-events:none;
 }
 
@@ -143,7 +143,6 @@ body::after {
         0 0 60px rgba(123,47,247,0.7);
 }
 
-/* reveal */
 .show {
     animation: pop 0.45s ease forwards;
 }
@@ -155,13 +154,13 @@ body::after {
     }
 }
 
-/* ROCKET (scaled to text) */
+/* ROCKET — perfectly horizontal */
 .rocket {
     position:absolute;
     top:50%;
-    left:-200px;
-    transform:translateY(-50%);
-    font-size:70px;
+    left:-250px;
+    transform:translateY(-50%) rotate(0deg); /* forced horizontal */
+    font-size:5.2em; /* EXACT match with text scale */
     z-index:10;
 }
 
@@ -172,7 +171,6 @@ body::after {
     padding:60px 20px;
 }
 
-/* CARD */
 .card {
     background: rgba(255,255,255,0.05);
     backdrop-filter: blur(14px);
@@ -186,14 +184,12 @@ body::after {
     box-shadow:0 0 40px rgba(123,47,247,0.3);
 }
 
-/* GRID */
 .grid {
     display:grid;
     grid-template-columns:1fr 1fr;
     gap:20px;
 }
 
-/* BUTTON */
 .btn {
     padding:10px 18px;
     border:none;
@@ -205,7 +201,6 @@ body::after {
     margin-top:10px;
 }
 
-/* CANVAS */
 canvas {
     width:100%;
     height:300px;
@@ -213,7 +208,6 @@ canvas {
     border-radius:12px;
 }
 
-/* CONSOLE */
 .console {
     height:300px;
     overflow:auto;
@@ -224,7 +218,6 @@ canvas {
     border-radius:10px;
 }
 
-/* FEATURES */
 .features {
     display:grid;
     grid-template-columns: repeat(auto-fit, minmax(250px,1fr));
@@ -236,7 +229,6 @@ canvas {
     background: linear-gradient(135deg, rgba(123,47,247,0.2), rgba(0,212,255,0.15));
 }
 
-/* ACCORDION */
 .accordion { cursor:pointer; }
 .panel {
     max-height:0;
@@ -250,7 +242,6 @@ canvas {
     padding:10px;
 }
 
-/* FOOTER */
 .footer {
     text-align:center;
     padding:60px 20px;
@@ -357,7 +348,7 @@ Built for Hackathon · Orbit v2.0
 </div>
 
 <script>
-/* ROCKET + TRUE POSITION SYNC */
+/* ROCKET + LETTER SYNC */
 window.onload = () => {
     const rocket = document.getElementById("rocket");
     const letters = document.querySelectorAll("#orbitText span");
@@ -399,7 +390,53 @@ document.querySelectorAll(".accordion").forEach((btn,i)=>{
     });
 });
 
-/* WEBSOCKET (unchanged) */
+/* ORBIT SIMULATION (RESTORED) */
+const canvas = document.getElementById('orbitCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = canvas.offsetWidth;
+canvas.height = canvas.offsetHeight;
+
+let angle = 0;
+
+function drawOrbit(){
+    ctx.fillStyle="rgba(0,0,0,0.3)";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    let cx = canvas.width/2;
+    let cy = canvas.height/2;
+
+    for(let i=0;i<30;i++){
+        ctx.fillStyle="white";
+        ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height,1,1);
+    }
+
+    let grd = ctx.createRadialGradient(cx,cy,10,cx,cy,40);
+    grd.addColorStop(0,"#00d4ff");
+    grd.addColorStop(1,"transparent");
+    ctx.fillStyle=grd;
+    ctx.beginPath();
+    ctx.arc(cx,cy,40,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.strokeStyle="#444";
+    ctx.beginPath();
+    ctx.arc(cx,cy,100,0,Math.PI*2);
+    ctx.stroke();
+
+    let x = cx + 100*Math.cos(angle);
+    let y = cy + 100*Math.sin(angle);
+
+    ctx.fillStyle="#fff";
+    ctx.beginPath();
+    ctx.arc(x,y,4,0,Math.PI*2);
+    ctx.fill();
+
+    angle += 0.01;
+    requestAnimationFrame(drawOrbit);
+}
+drawOrbit();
+
+/* WEBSOCKET */
 let ws;
 function log(msg){
     let c = document.getElementById("console");
