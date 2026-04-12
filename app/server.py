@@ -92,42 +92,41 @@ async def root():
 <title>ORBIT — AI Space Mission Architect</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-html, body { height:100%; margin:0; }
+html, body { margin:0; padding:0; min-height:100%; }
 body {
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     color:#e5edf7;
-    overflow:hidden;
+    overflow-x:hidden;
     background:
         radial-gradient(circle at 15% 20%, rgba(0,212,255,0.12), transparent 28%),
-        radial-gradient(circle at 85% 15%, rgba(123,47,247,0.16), transparent 30%),
+        radial-gradient(circle at 85% 15%, rgba(123,47,247,0.15), transparent 30%),
         radial-gradient(circle at 50% 85%, rgba(255,255,255,0.04), transparent 18%),
         linear-gradient(180deg, #050814 0%, #07101f 50%, #050914 100%);
 }
 
-/* subtle star layer */
+/* stars */
 body::before{
     content:"";
     position:fixed;
     inset:0;
     pointer-events:none;
-    background-image:
-        radial-gradient(rgba(255,255,255,0.22) 1px, transparent 1px);
+    background-image: radial-gradient(rgba(255,255,255,0.20) 1px, transparent 1px);
     background-size: 54px 54px;
-    opacity:.18;
+    opacity:.16;
 }
 
-/* hud grid */
+/* subtle grid */
 body::after{
     content:"";
     position:fixed;
     inset:0;
     pointer-events:none;
     background:
-        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-    background-size: 44px 44px;
-    mask-image: radial-gradient(circle at center, black 40%, transparent 95%);
-    opacity:.18;
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(circle at center, black 42%, transparent 94%);
+    opacity:.16;
 }
 
 .mono {
@@ -139,12 +138,12 @@ body::after{
     backdrop-filter: blur(16px);
     border: 1px solid rgba(148,163,184,0.12);
     box-shadow:
-        0 10px 25px rgba(0,0,0,0.26),
+        0 10px 25px rgba(0,0,0,0.24),
         inset 0 1px 0 rgba(255,255,255,0.03);
 }
 
 .panel-soft {
-    background: rgba(15,23,42,0.52);
+    background: rgba(15,23,42,0.54);
     border: 1px solid rgba(148,163,184,0.10);
 }
 
@@ -202,7 +201,6 @@ body::after{
     background: linear-gradient(90deg, #22d3ee, #60a5fa, #a855f7);
     -webkit-background-clip:text;
     background-clip:text;
-    text-shadow: 0 0 30px rgba(34,211,238,.12);
 }
 .boot-sub {
     margin-top: 14px;
@@ -242,7 +240,7 @@ body::after{
     color:#f8fafc;
     font-weight:600;
     cursor:pointer;
-    transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+    transition: transform .2s ease, box-shadow .2s ease;
 }
 .boot-button:hover {
     transform: translateY(-1px);
@@ -251,37 +249,23 @@ body::after{
 
 .main-shell {
     opacity:0;
-    transform: translateY(10px) scale(.995);
+    transform: translateY(10px);
     transition: opacity .8s ease, transform .8s ease;
 }
 .main-shell.ready {
     opacity:1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
 }
 
 .reveal {
     opacity:0;
-    transform: translateY(20px);
+    transform: translateY(18px);
 }
 .reveal.show {
     opacity:1;
     transform: translateY(0);
     transition: opacity .7s ease, transform .7s ease;
 }
-
-.grid-shell {
-    height:100vh;
-    display:grid;
-    grid-template-columns: 300px minmax(0,1fr) 360px;
-    grid-template-rows: auto minmax(0,1fr) 230px;
-    gap:16px;
-    padding:16px;
-}
-.topbar { grid-column:1 / -1; }
-.sidebar { grid-column:1; min-height:0; }
-.center { grid-column:2; min-height:0; }
-.rightbar { grid-column:3; min-height:0; }
-.bottombar { grid-column:1 / -1; min-height:0; }
 
 .btn-primary {
     background: linear-gradient(135deg, #22d3ee, #3b82f6 50%, #8b5cf6);
@@ -298,6 +282,7 @@ body::after{
     background: rgba(30,41,59,.85);
     border-color: rgba(148,163,184,.22);
 }
+
 .btn-amber {
     background: linear-gradient(135deg, rgba(245,158,11,.22), rgba(249,115,22,.22));
     border:1px solid rgba(251,191,36,.22);
@@ -332,18 +317,6 @@ body::after{
     transform: translateY(-2px);
     border-color: rgba(148,163,184,.22);
 }
-
-@media (max-width: 1180px) {
-    .grid-shell {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto auto auto auto 260px;
-        height:auto;
-        min-height:100vh;
-        overflow:auto;
-    }
-    .topbar,.sidebar,.center,.rightbar,.bottombar { grid-column:1; }
-    body { overflow:auto; }
-}
 </style>
 </head>
 <body>
@@ -364,44 +337,44 @@ body::after{
     </div>
 </div>
 
-<!-- MAIN SHELL -->
-<div id="mainShell" class="main-shell">
-    <div class="grid-shell">
-
-        <!-- TOPBAR -->
-        <header class="topbar panel rounded-2xl px-5 py-4 reveal">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div class="flex items-start gap-4">
-                    <div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-violet-500 flex items-center justify-center text-2xl shadow-lg shadow-cyan-500/20">🚀</div>
-                    <div>
-                        <div class="flex items-center gap-3 flex-wrap">
-                            <h1 class="text-2xl font-semibold tracking-[0.18em]">ORBIT</h1>
-                            <span class="px-2.5 py-1 rounded-full text-xs border border-cyan-400/20 bg-cyan-400/10 text-cyan-300">OpenEnv RL Environment</span>
-                            <span class="px-2.5 py-1 rounded-full text-xs border border-violet-400/20 bg-violet-400/10 text-violet-300">Deterministic Physics</span>
-                        </div>
-                        <p class="text-sm text-slate-400 mt-1">Observe state · Execute actions · Inspect transitions · Plan fuel-efficient missions</p>
+<div id="mainShell" class="main-shell max-w-[1800px] mx-auto px-4 py-4 pb-8">
+    <!-- TOPBAR -->
+    <header class="panel rounded-2xl px-5 py-4 reveal mb-4">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex items-start gap-4">
+                <div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-violet-500 flex items-center justify-center text-2xl shadow-lg shadow-cyan-500/20">🚀</div>
+                <div>
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <h1 class="text-2xl font-semibold tracking-[0.18em]">ORBIT</h1>
+                        <span class="px-2.5 py-1 rounded-full text-xs border border-cyan-400/20 bg-cyan-400/10 text-cyan-300">OpenEnv RL Environment</span>
+                        <span class="px-2.5 py-1 rounded-full text-xs border border-violet-400/20 bg-violet-400/10 text-violet-300">Deterministic Physics</span>
                     </div>
-                </div>
-
-                <div class="flex flex-wrap items-center gap-3">
-                    <div class="flex items-center gap-2 px-3 py-2 rounded-xl panel-soft">
-                        <span id="connectionDot" class="status-dot dot-red"></span>
-                        <span id="connectionText" class="text-sm text-slate-300">Disconnected</span>
-                    </div>
-                    <div class="px-3 py-2 rounded-xl panel-soft text-sm text-slate-300">
-                        <span class="text-slate-500">Episode:</span>
-                        <span id="episodeText" class="ml-1">Idle</span>
-                    </div>
-                    <div class="px-3 py-2 rounded-xl panel-soft text-sm text-slate-300">
-                        <span class="text-slate-500">Task:</span>
-                        <span id="activeTaskText" class="ml-1 mono">leo_satellite</span>
-                    </div>
+                    <p class="text-sm text-slate-400 mt-1">Observe state · Execute actions · Inspect transitions · Plan fuel-efficient missions</p>
                 </div>
             </div>
-        </header>
 
-        <!-- SIDEBAR -->
-        <aside class="sidebar min-h-0 flex flex-col gap-4">
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="flex items-center gap-2 px-3 py-2 rounded-xl panel-soft">
+                    <span id="connectionDot" class="status-dot dot-red"></span>
+                    <span id="connectionText" class="text-sm text-slate-300">Disconnected</span>
+                </div>
+                <div class="px-3 py-2 rounded-xl panel-soft text-sm text-slate-300">
+                    <span class="text-slate-500">Episode:</span>
+                    <span id="episodeText" class="ml-1">Idle</span>
+                </div>
+                <div class="px-3 py-2 rounded-xl panel-soft text-sm text-slate-300">
+                    <span class="text-slate-500">Task:</span>
+                    <span id="activeTaskText" class="ml-1 mono">leo_satellite</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <div class="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)_360px] gap-4 items-start">
+
+        <!-- LEFT COLUMN -->
+        <div class="flex flex-col gap-4">
             <section class="panel rounded-2xl p-4 reveal">
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="text-sm font-semibold tracking-[0.16em] text-slate-200">MISSION SET</h2>
@@ -447,6 +420,40 @@ body::after{
                 </div>
             </section>
 
+            <!-- MOVED CONTROLS HIGHER -->
+            <section class="panel rounded-2xl p-4 reveal glow-cyan xl:sticky xl:top-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-semibold tracking-[0.16em] text-slate-200">CONTROL ACTIONS</h2>
+                    <span class="text-xs text-slate-500 mono">safe mode</span>
+                </div>
+
+                <div class="grid grid-cols-1 gap-3">
+                    <button class="h-12 rounded-xl btn-dark text-sm transition" onclick="connectWS()">Connect</button>
+                    <button class="h-12 rounded-xl btn-primary text-sm font-medium transition" onclick="resetMission()">Reset Episode</button>
+                    <button class="h-12 rounded-xl btn-amber text-sm transition" onclick="stepMission()">Execute Step</button>
+                </div>
+
+                <div class="mt-4 panel-soft rounded-xl p-3">
+                    <div class="text-xs text-slate-500 mb-2">Selected Task ID</div>
+                    <input id="taskInput" class="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none mono" value="leo_satellite" placeholder="task_id">
+                </div>
+
+                <div class="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
+                    <div class="panel-soft rounded-xl py-3 px-2">
+                        <div class="text-slate-500">Connect</div>
+                        <div class="mt-1 text-slate-200">WS</div>
+                    </div>
+                    <div class="panel-soft rounded-xl py-3 px-2">
+                        <div class="text-slate-500">Reset</div>
+                        <div class="mt-1 text-slate-200">Episode</div>
+                    </div>
+                    <div class="panel-soft rounded-xl py-3 px-2">
+                        <div class="text-slate-500">Step</div>
+                        <div class="mt-1 text-slate-200">Action</div>
+                    </div>
+                </div>
+            </section>
+
             <section class="panel rounded-2xl p-4 reveal">
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="text-sm font-semibold tracking-[0.16em] text-slate-200">MISSION BRIEFING</h2>
@@ -469,29 +476,11 @@ body::after{
                     </div>
                 </div>
             </section>
+        </div>
 
-            <section class="panel rounded-2xl p-4 reveal">
-                <div class="flex items-center justify-between mb-3">
-                    <h2 class="text-sm font-semibold tracking-[0.16em] text-slate-200">CONTROL ACTIONS</h2>
-                    <span class="text-xs text-slate-500 mono">safe mode</span>
-                </div>
-
-                <div class="grid grid-cols-1 gap-3">
-                    <button class="h-11 rounded-xl btn-dark text-sm transition" onclick="connectWS()">Connect</button>
-                    <button class="h-11 rounded-xl btn-primary text-sm font-medium transition" onclick="resetMission()">Reset Episode</button>
-                    <button class="h-11 rounded-xl btn-amber text-sm transition" onclick="stepMission()">Execute Step</button>
-                </div>
-
-                <div class="mt-4 panel-soft rounded-xl p-3">
-                    <div class="text-xs text-slate-500 mb-2">Selected Task ID</div>
-                    <input id="taskInput" class="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none mono" value="leo_satellite" placeholder="task_id">
-                </div>
-            </section>
-        </aside>
-
-        <!-- CENTER -->
-        <main class="center min-h-0 flex flex-col gap-4">
-            <section class="panel rounded-2xl p-4 flex flex-col min-h-0 reveal glow-cyan">
+        <!-- CENTER COLUMN -->
+        <div class="flex flex-col gap-4">
+            <section class="panel rounded-2xl p-4 reveal glow-cyan">
                 <div class="flex items-center justify-between mb-3">
                     <div>
                         <h2 class="text-sm font-semibold tracking-[0.16em] text-slate-200">ORBIT VISUALIZATION</h2>
@@ -499,12 +488,12 @@ body::after{
                     </div>
                     <div class="text-xs text-slate-500 mono">mission-control view</div>
                 </div>
-                <div class="flex-1 min-h-[320px] rounded-2xl overflow-hidden border border-slate-800 bg-black/35">
+                <div class="rounded-2xl overflow-hidden border border-slate-800 bg-black/35 h-[340px] md:h-[420px] xl:h-[460px]">
                     <canvas id="orbitCanvas" class="w-full h-full"></canvas>
                 </div>
             </section>
 
-            <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 reveal">
+            <section class="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4 gap-4 reveal">
                 <div class="telemetry-card panel rounded-2xl p-4">
                     <div class="text-xs tracking-[0.16em] text-slate-500">CURRENT TASK</div>
                     <div id="metricTask" class="mt-2 text-lg font-semibold">leo_satellite</div>
@@ -526,10 +515,10 @@ body::after{
                     <div class="text-xs text-slate-500 mt-1">Incoming WebSocket frames</div>
                 </div>
             </section>
-        </main>
+        </div>
 
-        <!-- RIGHTBAR -->
-        <aside class="rightbar min-h-0 flex flex-col gap-4">
+        <!-- RIGHT COLUMN -->
+        <div class="flex flex-col gap-4">
             <section class="panel rounded-2xl p-4 reveal glow-violet">
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="text-sm font-semibold tracking-[0.16em] text-slate-200">ENVIRONMENT LOOP</h2>
@@ -595,26 +584,26 @@ body::after{
                     LEO mission is the recommended first episode. Connect, reset the mission, then execute a step to inspect the transition response in the console feed below.
                 </div>
             </section>
-        </aside>
-
-        <!-- BOTTOM -->
-        <section class="bottombar panel rounded-2xl p-4 reveal">
-            <div class="flex items-center justify-between mb-3">
-                <div>
-                    <h2 class="text-sm font-semibold tracking-[0.16em] text-slate-200">TELEMETRY CONSOLE</h2>
-                    <p class="text-xs text-slate-500 mt-1">Raw WebSocket event stream and protocol traffic</p>
-                </div>
-                <button onclick="clearConsole()" class="px-3 py-2 rounded-xl btn-dark text-xs transition">Clear Console</button>
-            </div>
-
-            <div id="console" class="h-[150px] overflow-auto scrollbar-thin rounded-2xl bg-black/40 border border-slate-800 p-4 mono text-[13px] leading-6 text-slate-300"></div>
-        </section>
+        </div>
     </div>
+
+    <!-- CONSOLE -->
+    <section class="panel rounded-2xl p-4 reveal mt-4">
+        <div class="flex items-center justify-between mb-3">
+            <div>
+                <h2 class="text-sm font-semibold tracking-[0.16em] text-slate-200">TELEMETRY CONSOLE</h2>
+                <p class="text-xs text-slate-500 mt-1">Raw WebSocket event stream and protocol traffic</p>
+            </div>
+            <button onclick="clearConsole()" class="px-3 py-2 rounded-xl btn-dark text-xs transition">Clear Console</button>
+        </div>
+
+        <div id="console" class="h-[220px] overflow-auto scrollbar-thin rounded-2xl bg-black/40 border border-slate-800 p-4 mono text-[13px] leading-6 text-slate-300"></div>
+    </section>
 </div>
 
 <script>
 /* -------------------------------------------------------------------------- */
-/* BOOT TRANSITION */
+/* BOOT / INTRO */
 /* -------------------------------------------------------------------------- */
 const bootMessages = [
     "Initializing mission control interface...",
@@ -653,7 +642,7 @@ function enterMissionControl() {
 
     const reveals = document.querySelectorAll(".reveal");
     reveals.forEach((el, i) => {
-        setTimeout(() => el.classList.add("show"), 120 + i * 90);
+        setTimeout(() => el.classList.add("show"), 120 + i * 80);
     });
 }
 
@@ -668,18 +657,21 @@ const missionMeta = {
         title: "LEO Satellite Deployment",
         summary: "Launch to a 400 km circular orbit matching ISS inclination. Choose the correct strategic transfer and submit efficiently.",
         reference: "Falcon 9 → ISS",
+        plan: "Hohmann transfer → submit",
         notes: "Recommended starting task. Reset the episode, then execute a step to inspect the environment transition."
     },
     lunar_orbit: {
         title: "Lunar Orbit Insertion",
         summary: "Transfer from Earth parking orbit to lunar orbit using correct sequencing and careful fuel management.",
         reference: "Apollo / Artemis",
+        plan: "TLI → LOI → optional circularize",
         notes: "Multi-burn mission. Use this after verifying the environment loop on the LEO task."
     },
     asteroid_rendezvous: {
         title: "Asteroid Bennu Rendezvous",
         summary: "Deep-space rendezvous scenario requiring gravity-assist aware planning and more strategic sequencing.",
         reference: "OSIRIS-REx",
+        plan: "Gravity assist → gravity assist → combined transfer → corrections",
         notes: "Most complex mission. Best for testing longer strategic trajectories and richer multi-step interaction."
     }
 };
@@ -788,6 +780,7 @@ function selectTask(taskId, el) {
         document.getElementById("briefTitle").textContent = meta.title;
         document.getElementById("briefSummary").textContent = meta.summary;
         document.getElementById("briefReference").textContent = meta.reference;
+        document.getElementById("briefPlan").textContent = meta.plan;
         document.getElementById("notesBox").textContent = meta.notes;
     }
 
@@ -950,14 +943,12 @@ function drawOrbit() {
 
     ctx.clearRect(0, 0, w, h);
 
-    // background
     const bg = ctx.createLinearGradient(0, 0, 0, h);
     bg.addColorStop(0, "#020617");
     bg.addColorStop(1, "#030712");
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, w, h);
 
-    // stars
     for (const s of stars) {
         ctx.fillStyle = `rgba(255,255,255,${s.a})`;
         ctx.beginPath();
@@ -968,7 +959,6 @@ function drawOrbit() {
     const cx = w / 2;
     const cy = h / 2;
 
-    // radar rings
     ctx.strokeStyle = "rgba(148,163,184,0.10)";
     ctx.lineWidth = 1;
     [70, 120, 170, 220].forEach(r => {
@@ -977,7 +967,6 @@ function drawOrbit() {
         ctx.stroke();
     });
 
-    // crosshair
     ctx.strokeStyle = "rgba(148,163,184,0.08)";
     ctx.beginPath();
     ctx.moveTo(cx - 260, cy);
@@ -988,7 +977,6 @@ function drawOrbit() {
     ctx.lineTo(cx, cy + 180);
     ctx.stroke();
 
-    // earth
     const earthGlow = ctx.createRadialGradient(cx, cy, 12, cx, cy, 48);
     earthGlow.addColorStop(0, "rgba(34,211,238,0.85)");
     earthGlow.addColorStop(1, "rgba(34,211,238,0)");
@@ -1005,7 +993,6 @@ function drawOrbit() {
     ctx.arc(cx, cy, 24, 0, Math.PI * 2);
     ctx.fill();
 
-    // target orbit
     ctx.setLineDash([8, 8]);
     ctx.strokeStyle = "rgba(168,85,247,0.75)";
     ctx.lineWidth = 2;
@@ -1014,14 +1001,12 @@ function drawOrbit() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // current orbit
     ctx.strokeStyle = "rgba(34,211,238,0.85)";
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(cx, cy, 105, 0, Math.PI * 2);
     ctx.stroke();
 
-    // satellite
     const sx = cx + Math.cos(angle) * 105;
     const sy = cy + Math.sin(angle) * 105;
 
@@ -1033,7 +1018,6 @@ function drawOrbit() {
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    // labels
     ctx.fillStyle = "rgba(226,232,240,0.75)";
     ctx.font = "12px ui-monospace, monospace";
     ctx.fillText("current orbit", cx + 112, cy + 10);
