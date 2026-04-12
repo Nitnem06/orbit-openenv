@@ -98,75 +98,71 @@ body {
     font-family: 'Segoe UI', sans-serif;
     color:#e0e0e0;
     overflow-x:hidden;
-    background: radial-gradient(circle at 20% 20%, #1a1f4d, #0a0e1a 40%),
-                radial-gradient(circle at 80% 30%, #2a0845, transparent 40%),
-                radial-gradient(circle at 50% 80%, #003973, transparent 40%);
+
+    background:
+        radial-gradient(circle at 20% 20%, rgba(0,212,255,0.25), transparent 40%),
+        radial-gradient(circle at 80% 30%, rgba(123,47,247,0.25), transparent 40%),
+        radial-gradient(circle at 50% 80%, rgba(255,107,203,0.2), transparent 40%),
+        #0a0e1a;
 }
 
-/* glow blobs */
-body::before, body::after {
+/* subtle stars */
+body::after {
     content:"";
     position:fixed;
-    width:400px;
-    height:400px;
-    border-radius:50%;
-    filter: blur(120px);
-    opacity:0.2;
+    width:100%;
+    height:100%;
+    background-image: radial-gradient(white 1px, transparent 1px);
+    background-size: 80px 80px;
+    opacity:0.08;
+    pointer-events:none;
 }
-body::before { background:#7b2ff7; top:-100px; left:-100px; }
-body::after { background:#00d4ff; bottom:-100px; right:-100px; }
 
 /* HEADER */
 .header {
     text-align:center;
-    padding:100px 20px 40px;
+    padding:120px 20px 40px;
     position:relative;
 }
 
-/* ORBIT TEXT (3D + hidden initially) */
-.header h1 span {
+/* ORBIT TEXT */
+#orbitText span {
     display:inline-block;
-    font-size:4.5em;
-    letter-spacing:10px;
+    font-size:5.2em;
+    letter-spacing:12px;
     opacity:0;
-    transform:translateY(60px) scale(0.8);
+    transform:translateY(60px) scale(0.7);
 
-    background: linear-gradient(180deg,#ffffff,#00d4ff,#7b2ff7);
+    background: linear-gradient(135deg,#00d4ff,#7b2ff7,#ff6bcb,#b794f4);
     -webkit-background-clip:text;
     -webkit-text-fill-color:transparent;
 
     text-shadow:
-        0 5px 0 rgba(0,0,0,0.4),
-        0 10px 20px rgba(0,212,255,0.5),
-        0 0 40px rgba(123,47,247,0.6);
+        0 6px 0 rgba(0,0,0,0.4),
+        0 12px 25px rgba(0,212,255,0.5),
+        0 0 60px rgba(123,47,247,0.7);
 }
 
-/* letter reveal */
-.reveal {
-    animation: letterReveal 0.5s ease forwards;
+/* reveal */
+.show {
+    animation: pop 0.45s ease forwards;
 }
 
-@keyframes letterReveal {
+@keyframes pop {
     to {
         opacity:1;
         transform:translateY(0) scale(1);
     }
 }
 
-/* ROCKET */
+/* ROCKET (scaled to text) */
 .rocket {
     position:absolute;
     top:50%;
-    left:-150px;
+    left:-200px;
     transform:translateY(-50%);
-    font-size:40px;
+    font-size:70px;
     z-index:10;
-}
-
-/* rocket animation */
-@keyframes flyRocket {
-    0% { left:-150px; }
-    100% { left:110%; }
 }
 
 /* SECTION */
@@ -242,7 +238,6 @@ canvas {
 
 /* ACCORDION */
 .accordion { cursor:pointer; }
-
 .panel {
     max-height:0;
     overflow:hidden;
@@ -262,7 +257,6 @@ canvas {
     color:#6b7280;
 }
 
-/* RESPONSIVE */
 @media(max-width:800px){
     .grid { grid-template-columns:1fr; }
 }
@@ -273,25 +267,28 @@ canvas {
 
 <div class="header">
     <div class="rocket" id="rocket">🚀</div>
+
     <h1 id="orbitText">
         <span>O</span><span>R</span><span>B</span><span>I</span><span>T</span>
     </h1>
+
     <p>AI Space Mission Architect</p>
 </div>
 
+<!-- HERO -->
 <div class="section">
 <div class="card">
-    <h2>🚀 What is Orbit?</h2>
-    <p>
-    Orbit is a next-generation RL environment where AI agents design space missions
-    using real orbital mechanics — optimizing fuel, trajectory, and mission success.
-    </p>
+<h2>🚀 What is Orbit?</h2>
+<p>
+Orbit is a next-generation RL environment where AI agents design space missions
+using real orbital mechanics — optimizing fuel, trajectory, and mission success.
+</p>
 </div>
 </div>
 
+<!-- SIMULATOR -->
 <div class="section">
 <div class="grid">
-
 <div class="card">
 <h3>🛰️ Orbit Simulation</h3>
 <canvas id="orbitCanvas"></canvas>
@@ -307,20 +304,21 @@ canvas {
 
 <input id="taskInput" placeholder="task_id (leo_satellite)">
 </div>
-
 </div>
 </div>
 
+<!-- FEATURES -->
 <div class="section">
 <h2>✨ Features</h2>
 <div class="features">
-    <div class="feature">⚡ Real-time mission simulation</div>
-    <div class="feature">🧠 RL-ready environment</div>
-    <div class="feature">🛰️ Orbital maneuver planning</div>
-    <div class="feature">📊 Deterministic scoring</div>
+<div class="feature">⚡ Real-time mission simulation</div>
+<div class="feature">🧠 RL-ready environment</div>
+<div class="feature">🛰️ Orbital maneuver planning</div>
+<div class="feature">📊 Deterministic scoring</div>
 </div>
 </div>
 
+<!-- MISSIONS -->
 <div class="section">
 <h2>🚀 Missions</h2>
 
@@ -335,25 +333,62 @@ canvas {
 
 </div>
 
+<!-- RESTORED -->
+<div class="section">
+<div class="card">
+<h2>📡 Why It Matters</h2>
+<p>
+This project bridges AI and aerospace engineering — enabling intelligent
+decision-making in mission-critical environments.
+</p>
+</div>
+
+<div class="card">
+<h2>🌍 Future Scope</h2>
+<p>
+Multi-agent planning, real-time trajectory visualization, and integration with
+space datasets.
+</p>
+</div>
+</div>
+
 <div class="footer">
-    Built for Hackathon · Orbit v2.0
+Built for Hackathon · Orbit v2.0
 </div>
 
 <script>
-/* ROCKET + LETTER REVEAL */
+/* ROCKET + TRUE POSITION SYNC */
 window.onload = () => {
     const rocket = document.getElementById("rocket");
     const letters = document.querySelectorAll("#orbitText span");
+    const header = document.querySelector(".header");
 
-    rocket.style.animation = "flyRocket 2s linear forwards";
+    const totalWidth = header.offsetWidth;
+    let start = null;
 
-    let delay = 400;
+    function animate(t){
+        if(!start) start = t;
+        let progress = (t - start)/2200;
 
-    letters.forEach((letter, i) => {
-        setTimeout(() => {
-            letter.classList.add("reveal");
-        }, delay + i * 200);
-    });
+        let x = progress * totalWidth;
+        rocket.style.left = x + "px";
+
+        letters.forEach(letter=>{
+            let rect = letter.getBoundingClientRect();
+            let mid = rect.left + rect.width/2;
+
+            if(x >= mid && !letter.classList.contains("show")){
+                letter.classList.add("show");
+            }
+        });
+
+        if(progress < 1.2){
+            requestAnimationFrame(animate);
+        } else {
+            rocket.style.display="none";
+        }
+    }
+    requestAnimationFrame(animate);
 };
 
 /* ACCORDION */
@@ -364,66 +399,22 @@ document.querySelectorAll(".accordion").forEach((btn,i)=>{
     });
 });
 
-/* ORBIT SIMULATION */
-const canvas = document.getElementById('orbitCanvas');
-const ctx = canvas.getContext('2d');
-canvas.width = canvas.offsetWidth;
-canvas.height = canvas.offsetHeight;
-
-let angle = 0;
-
-function drawOrbit(){
-    ctx.fillStyle="rgba(0,0,0,0.3)";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-
-    let cx = canvas.width/2;
-    let cy = canvas.height/2;
-
-    let grd = ctx.createRadialGradient(cx,cy,10,cx,cy,40);
-    grd.addColorStop(0,"#00d4ff");
-    grd.addColorStop(1,"transparent");
-    ctx.fillStyle=grd;
-    ctx.beginPath();
-    ctx.arc(cx,cy,40,0,Math.PI*2);
-    ctx.fill();
-
-    ctx.strokeStyle="#444";
-    ctx.beginPath();
-    ctx.arc(cx,cy,100,0,Math.PI*2);
-    ctx.stroke();
-
-    let x = cx + 100*Math.cos(angle);
-    let y = cy + 100*Math.sin(angle);
-
-    ctx.fillStyle="#fff";
-    ctx.beginPath();
-    ctx.arc(x,y,4,0,Math.PI*2);
-    ctx.fill();
-
-    angle += 0.01;
-    requestAnimationFrame(drawOrbit);
-}
-drawOrbit();
-
-/* WEBSOCKET */
+/* WEBSOCKET (unchanged) */
 let ws;
 function log(msg){
     let c = document.getElementById("console");
     c.innerHTML += msg + "<br>";
     c.scrollTop = c.scrollHeight;
 }
-
 function connectWS(){
     ws = new WebSocket("wss://" + location.host + "/ws");
     ws.onopen = () => log("✅ Connected");
     ws.onmessage = (e) => log("📩 " + e.data);
 }
-
 function resetMission(){
     let task = document.getElementById("taskInput").value || "leo_satellite";
     ws.send(JSON.stringify({type:"reset", task_id:task}));
 }
-
 function stepMission(){
     ws.send(JSON.stringify({
         type:"step",
