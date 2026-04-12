@@ -33,7 +33,11 @@ from openai import OpenAI
 
 API_BASE_URL   = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME     = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-72B-Instruct")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = (
+    os.getenv("API_KEY") or
+    os.getenv("OPENAI_API_KEY") or
+    os.getenv("HF_TOKEN")
+)
 
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 
@@ -379,7 +383,7 @@ async def main() -> None:
     print(f"[DEBUG] API_BASE_URL={API_BASE_URL}", flush=True)
     print(f"[DEBUG] MODEL_NAME={MODEL_NAME}", flush=True)
     print(f"[DEBUG] WS_URL={WS_URL}", flush=True)
-    print(f"[DEBUG] OPENAI_API_KEY={'set' if OPENAI_API_KEY else 'NOT SET'}", flush=True)
+    print(f"[DEBUG] API_KEY={'set' if OPENAI_API_KEY else 'NOT SET'}", flush=True)
 
     # Validate API key
     if not OPENAI_API_KEY:
