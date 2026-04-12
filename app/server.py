@@ -103,7 +103,7 @@ body {
                 radial-gradient(circle at 50% 80%, #003973, transparent 40%);
 }
 
-/* floating glow blobs */
+/* glow blobs */
 body::before, body::after {
     content:"";
     position:fixed;
@@ -116,42 +116,57 @@ body::before, body::after {
 body::before { background:#7b2ff7; top:-100px; left:-100px; }
 body::after { background:#00d4ff; bottom:-100px; right:-100px; }
 
-/* ROCKET */
-.rocket {
-    position:fixed;
-    top:50%;
-    left:-200px;
-    transform:translateY(-50%);
-    font-size:40px;
-    z-index:9999;
-    animation: flyRocket 1.2s ease-out forwards;
-}
-
 /* HEADER */
 .header {
     text-align:center;
-    padding:80px 20px 40px;
+    padding:100px 20px 40px;
+    position:relative;
 }
 
-.header h1 {
-    font-size:3.8em;
-    letter-spacing:8px;
-    position:relative;
+/* ORBIT TEXT (3D + hidden initially) */
+.header h1 span {
+    display:inline-block;
+    font-size:4.5em;
+    letter-spacing:10px;
     opacity:0;
-    transform:translateY(40px);
+    transform:translateY(60px) scale(0.8);
 
-    background: linear-gradient(90deg,#00d4ff,#7b2ff7,#ff6bcb,#00d4ff);
-    background-size:300%;
+    background: linear-gradient(180deg,#ffffff,#00d4ff,#7b2ff7);
     -webkit-background-clip:text;
     -webkit-text-fill-color:transparent;
 
     text-shadow:
-        0 0 10px rgba(0,212,255,0.8),
-        0 0 20px rgba(123,47,247,0.6),
-        0 0 40px rgba(255,107,203,0.4);
+        0 5px 0 rgba(0,0,0,0.4),
+        0 10px 20px rgba(0,212,255,0.5),
+        0 0 40px rgba(123,47,247,0.6);
+}
 
-    animation: gradientFlow 6s infinite, fadeInOrbit 1.2s ease forwards;
-    animation-delay: 0s, 1.2s;
+/* letter reveal */
+.reveal {
+    animation: letterReveal 0.5s ease forwards;
+}
+
+@keyframes letterReveal {
+    to {
+        opacity:1;
+        transform:translateY(0) scale(1);
+    }
+}
+
+/* ROCKET */
+.rocket {
+    position:absolute;
+    top:50%;
+    left:-150px;
+    transform:translateY(-50%);
+    font-size:40px;
+    z-index:10;
+}
+
+/* rocket animation */
+@keyframes flyRocket {
+    0% { left:-150px; }
+    100% { left:110%; }
 }
 
 /* SECTION */
@@ -226,9 +241,7 @@ canvas {
 }
 
 /* ACCORDION */
-.accordion {
-    cursor:pointer;
-}
+.accordion { cursor:pointer; }
 
 .panel {
     max-height:0;
@@ -249,31 +262,6 @@ canvas {
     color:#6b7280;
 }
 
-/* ANIMATIONS */
-@keyframes gradientFlow {
-    0% { background-position:0% }
-    50% { background-position:100% }
-    100% { background-position:0% }
-}
-
-@keyframes fadeInOrbit {
-    to {
-        opacity:1;
-        transform:translateY(0);
-    }
-}
-
-@keyframes flyRocket {
-    0% {
-        left:-200px;
-        transform:translateY(-50%) rotate(10deg);
-    }
-    100% {
-        left:110%;
-        transform:translateY(-50%) rotate(0deg);
-    }
-}
-
 /* RESPONSIVE */
 @media(max-width:800px){
     .grid { grid-template-columns:1fr; }
@@ -283,10 +271,11 @@ canvas {
 
 <body>
 
-<div class="rocket">🚀</div>
-
 <div class="header">
-    <h1>ORBIT</h1>
+    <div class="rocket" id="rocket">🚀</div>
+    <h1 id="orbitText">
+        <span>O</span><span>R</span><span>B</span><span>I</span><span>T</span>
+    </h1>
     <p>AI Space Mission Architect</p>
 </div>
 
@@ -336,38 +325,14 @@ canvas {
 <h2>🚀 Missions</h2>
 
 <div class="card accordion">LEO Satellite Deployment</div>
-<div class="panel">
-Launch a satellite to 400 km orbit at ISS inclination (51.6°). High fuel margin, ideal baseline mission.
-</div>
+<div class="panel">Launch a satellite to 400 km orbit.</div>
 
 <div class="card accordion">Lunar Orbit Insertion</div>
-<div class="panel">
-Earth → Moon transfer using Trans-Lunar Injection and Lunar Orbit Insertion burns.
-</div>
+<div class="panel">Earth → Moon transfer mission.</div>
 
 <div class="card accordion">Asteroid Bennu Rendezvous</div>
-<div class="panel">
-Deep-space mission using gravity assists and multi-step trajectory optimization.
-</div>
+<div class="panel">Deep space trajectory optimization.</div>
 
-</div>
-
-<div class="section">
-<div class="card">
-<h2>📡 Why It Matters</h2>
-<p>
-This project bridges AI and aerospace engineering — enabling intelligent
-decision-making in mission-critical environments.
-</p>
-</div>
-
-<div class="card">
-<h2>🌍 Future Scope</h2>
-<p>
-Multi-agent planning, real-time trajectory visualization, and integration with
-space datasets.
-</p>
-</div>
 </div>
 
 <div class="footer">
@@ -375,13 +340,21 @@ space datasets.
 </div>
 
 <script>
-/* ROCKET CONTROL */
-window.addEventListener("load", () => {
-    const rocket = document.querySelector(".rocket");
-    setTimeout(() => {
-        rocket.style.display = "none";
-    }, 1200);
-});
+/* ROCKET + LETTER REVEAL */
+window.onload = () => {
+    const rocket = document.getElementById("rocket");
+    const letters = document.querySelectorAll("#orbitText span");
+
+    rocket.style.animation = "flyRocket 2s linear forwards";
+
+    let delay = 400;
+
+    letters.forEach((letter, i) => {
+        setTimeout(() => {
+            letter.classList.add("reveal");
+        }, delay + i * 200);
+    });
+};
 
 /* ACCORDION */
 document.querySelectorAll(".accordion").forEach((btn,i)=>{
@@ -406,11 +379,6 @@ function drawOrbit(){
     let cx = canvas.width/2;
     let cy = canvas.height/2;
 
-    for(let i=0;i<30;i++){
-        ctx.fillStyle="white";
-        ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height,1,1);
-    }
-
     let grd = ctx.createRadialGradient(cx,cy,10,cx,cy,40);
     grd.addColorStop(0,"#00d4ff");
     grd.addColorStop(1,"transparent");
@@ -424,23 +392,12 @@ function drawOrbit(){
     ctx.arc(cx,cy,100,0,Math.PI*2);
     ctx.stroke();
 
-    ctx.beginPath();
-    ctx.arc(cx,cy,150,0,Math.PI*2);
-    ctx.stroke();
-
-    let x1 = cx + 100*Math.cos(angle);
-    let y1 = cy + 100*Math.sin(angle);
-
-    let x2 = cx + 150*Math.cos(-angle*0.7);
-    let y2 = cy + 150*Math.sin(-angle*0.7);
+    let x = cx + 100*Math.cos(angle);
+    let y = cy + 100*Math.sin(angle);
 
     ctx.fillStyle="#fff";
     ctx.beginPath();
-    ctx.arc(x1,y1,4,0,Math.PI*2);
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(x2,y2,4,0,Math.PI*2);
+    ctx.arc(x,y,4,0,Math.PI*2);
     ctx.fill();
 
     angle += 0.01;
